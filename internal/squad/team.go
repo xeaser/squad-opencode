@@ -2,6 +2,7 @@ package squad
 
 import (
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
@@ -83,7 +84,8 @@ func splitTableCells(line string) []string {
 
 // ReadTeam loads and parses .squad/team.md.
 func ReadTeam(projectRoot string) ([]TeamMember, error) {
-	data, err := os.ReadFile(TeamPath(projectRoot))
+	path := filepath.Join(ResolveDir(projectRoot), "team.md")
+	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil

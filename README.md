@@ -43,9 +43,16 @@ OpenCode creates `.opencode/package.json` (`@opencode-ai/plugin`) and runs an in
 
 | Command | Role |
 |---------|------|
-| `squad-oc init --preset default` | Scaffold `.squad/` + `.opencode/` |
-| `squad-oc doctor` | PATH, scaffold, optional OpenCode server probe (Go SDK) |
-| `squad-oc status` | Print team from `.squad/team.md` |
+| `init` | Scaffold `.squad/` + `.opencode/` |
+| `upgrade` | Refresh host templates; never wipe team state |
+| `doctor` / `status` / `cast` | Health and team table |
+| `run -p` | Prompt `opencode serve` (HTTP API on :4096) as `squad` |
+| `watch [--execute] [--once]` | Issue triage (Ralph); execute uses `run` |
+| `export` / `import` | JSON snapshot of `.squad/` |
+| `externalize` / `internalize` | Move team state out of the worktree |
+| `nap` / `scrub-emails` | Context and PII hygiene |
+| `upstream` / `pack` / `link` | Template sources, packs, shared team |
+| `update-check` | Local version vs GitHub latest release |
 
 ## Layout
 

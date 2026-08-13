@@ -25,6 +25,10 @@ node_modules/
 .squad/comms/*
 !.squad/comms/.gitkeep
 
+# Local CLI scratch
+tmp-export.json
+squad-export.json
+
 # --- Secrets ---
 .env
 .env.*

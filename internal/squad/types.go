@@ -6,6 +6,10 @@ type Config struct {
 	Host               string `json:"host"`
 	Preset             string `json:"preset"`
 	ProjectDescription string `json:"projectDescription,omitempty"`
+	// ExternalPath, if set, is the real .squad directory (externalize).
+	ExternalPath string `json:"externalPath,omitempty"`
+	// LinkPath, if set, is a remote/shared team directory (link).
+	LinkPath string `json:"linkPath,omitempty"`
 }
 
 // TeamMember is a parsed row from .squad/team.md.

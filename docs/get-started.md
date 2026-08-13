@@ -116,6 +116,15 @@ squad-oc init --preset default --description "Recipe sharing app with React and 
 
 Re-running `init` is safe (no overwrite once `.squad/config.json` exists).
 
+Other commands (see `squad-oc help`): `run -p` against a live OpenCode server, `watch --once` for issue triage, `export`/`import`, `nap`, `scrub-emails`.
+
+To refresh OpenCode agents/skills after a `squad-oc` update (team files stay put):
+
+```bash
+squad-oc upgrade --dry-run
+squad-oc upgrade
+```
+
 Validate:
 
 ```bash
@@ -124,6 +133,18 @@ squad-oc status
 ```
 
 `doctor` uses the **OpenCode Go SDK** for an *optional* server probe (`http://127.0.0.1:4096`). Missing server is soft; missing OpenCode binary or scaffold is hard.
+
+`squad-oc run` and `watch --execute` need the **HTTP API**, not the TUI:
+
+```bash
+# terminal 1 — headless API on :4096
+opencode serve
+
+# terminal 2
+squad-oc run -p "Summarize .squad/team.md"
+```
+
+Plain `opencode` opens the interactive UI and does **not** listen on 4096.
 
 ---
 

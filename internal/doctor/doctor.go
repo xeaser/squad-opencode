@@ -52,7 +52,7 @@ func RunChecks(projectRoot string) []Check {
 	checks = append(checks, Check{
 		Name:   "OpenCode server (optional)",
 		OK:     probe.Reachable,
-		Detail: probe.Detail + " — start with: opencode",
+		Detail: probe.Detail + " — start with: " + opencodeclient.StartHint + " (not the TUI)",
 		Hard:   false,
 	})
 

@@ -13,6 +13,13 @@ import (
 // DefaultBaseURL is the typical local OpenCode server address.
 const DefaultBaseURL = "http://127.0.0.1:4096"
 
+// StartHint is how to expose the HTTP API that squad-oc run/watch talk to.
+// The TUI (`opencode`) does not listen on :4096; `opencode serve` does.
+const StartHint = "opencode serve"
+
+// StartHelp is the user-facing explanation when the API is down.
+const StartHelp = "The TUI (`opencode`) is not the HTTP API. In another terminal, from this project:\n  opencode serve\nThen retry `squad-oc run`. Default URL: " + DefaultBaseURL
+
 // ProbeResult is a soft connectivity check for doctor.
 type ProbeResult struct {
 	Reachable bool
