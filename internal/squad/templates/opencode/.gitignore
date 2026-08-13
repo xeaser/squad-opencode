@@ -1,0 +1,8 @@
+# OpenCode writes these on first launch (plugin runtime install).
+# Keep agents/, skills/, commands/, and this file.
+node_modules/
+package.json
+package-lock.json
+bun.lock
+bun.lockb
+bunfig.toml

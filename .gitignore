@@ -1,0 +1,44 @@
+# --- Go ---
+/bin/
+/dist/
+*.exe
+*.test
+*.out
+coverage.out
+coverage.html
+vendor/
+# Binary at repo root only (do not ignore cmd/squad-oc/)
+/squad-oc
+/squad-oc.exe
+
+# --- OpenCode host install (not Squad source) ---
+# First `opencode` launch writes a plugin runtime under .opencode/
+node_modules/
+.opencode/node_modules/
+.opencode/package.json
+.opencode/package-lock.json
+.opencode/bun.lock
+.opencode/bun.lockb
+.opencode/bunfig.toml
+
+# --- Squad scratch ---
+.squad/comms/*
+!.squad/comms/.gitkeep
+
+# --- Secrets ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# --- OS / editors ---
+.DS_Store
+Thumbs.db
+Desktop.ini
+*~
+*.swp
+*.swo
+.idea/
+.vscode/
+*.log

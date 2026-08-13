@@ -1,0 +1,6 @@
+# Handoff scratch — keep the directory in git
+comms/*
+!comms/.gitkeep
+
+# Local-only runtime (if added later)
+*.tmp
