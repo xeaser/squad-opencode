@@ -222,13 +222,13 @@ squad-oc status
 | `opencode: command not found` | Install OpenCode; fix PATH |
 | No **squad** agent | `squad-oc init --preset default` in project root |
 | `Not initialized` | `squad-oc init --preset default` |
-| Server probe FAIL only | Soft check — run `opencode` if you want a live server |
+| Server probe FAIL only | Soft check — run `opencode serve` for the HTTP API on :4096 |
 | Build fails | `go version` ≥ 1.22; `go mod tidy` |
 
 ---
 
-## Out of scope (MVP)
+## Out of scope
 
-Watch/Ralph execute, upgrade pipeline, export/import, marketplace, Copilot.
+Copilot, an Ink/`squad` shell, Aspire, auto-starting `opencode serve`, and recast/`cast --add`.
 
-Orchestration will use **`github.com/sst/opencode-sdk-go`** (not the “OpenCode Go” model subscription).
+`run` / `watch --execute` use **`github.com/sst/opencode-sdk-go`** against `opencode serve` (not the “OpenCode Go” model subscription, and not the TUI).

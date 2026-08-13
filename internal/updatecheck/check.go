@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/squad-opencode/squad-opencode/internal/version"
@@ -54,6 +55,18 @@ func Check(client *http.Client) (Result, error) {
 		return res, err
 	}
 	res.Latest = payload.Tag
-	res.Message = fmt.Sprintf("local %s — latest %s", version.Version, payload.Tag)
+	res.Message = formatCompare(version.Version, payload.Tag)
 	return res, nil
+}
+
+func formatCompare(local, latest string) string {
+	status := "update available"
+	if sameVersion(local, latest) {
+		status = "up to date"
+	}
+	return fmt.Sprintf("%s — local %s, latest %s", status, local, latest)
+}
+
+func sameVersion(local, tag string) bool {
+	return strings.TrimPrefix(local, "v") == strings.TrimPrefix(tag, "v")
 }

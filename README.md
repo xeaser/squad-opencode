@@ -21,8 +21,14 @@ go build -o squad-oc ./cmd/squad-oc
 mkdir my-app && cd my-app && git init
 /path/to/squad-oc init --preset default
 /path/to/squad-oc doctor
+
+# Interactive TUI (does not listen on :4096)
 opencode
 # Tab → squad agent → "Set up the team for …" → yes
+
+# HTTP API for `run` / `watch --execute` (separate terminal)
+opencode serve
+squad-oc run -p "Summarize .squad/team.md"
 ```
 
 Full walkthrough: **[docs/get-started.md](docs/get-started.md)**
@@ -52,15 +58,20 @@ OpenCode creates `.opencode/package.json` (`@opencode-ai/plugin`) and runs an in
 | `externalize` / `internalize` | Move team state out of the worktree |
 | `nap` / `scrub-emails` | Context and PII hygiene |
 | `upstream` / `pack` / `link` | Template sources, packs, shared team |
-| `update-check` | Local version vs GitHub latest release |
+| `update-check` | Prints `up to date` or `update available` vs GitHub latest tag |
 
 ## Layout
 
 ```
-cmd/squad-oc/           # CLI
-internal/squad/         # domain + embedded templates
-internal/doctor/        # doctor checks
-internal/opencodeclient/# thin opencode-sdk-go wrapper
+cmd/squad-oc/            # main → internal/cli
+internal/cli/            # commands
+internal/squad/          # init, upgrade, export, externalize, nap, scrub, templates
+internal/opencodeclient/ # SDK + run (needs `opencode serve`)
+internal/watch/          # issue triage (Ralph)
+internal/githubissues/   # gh issue list
+internal/share/          # upstream / pack / link
+internal/updatecheck/
+internal/version/
 docs/
 ```
 
@@ -69,12 +80,24 @@ docs/
 ```
 squad-oc (Go)
   ├── embed templates → .squad / .opencode
-  └── github.com/sst/opencode-sdk-go → OpenCode server (watch/spawn later)
+  └── github.com/sst/opencode-sdk-go → opencode serve (:4096)
 ```
 
-## Non-goals (current MVP)
+`opencode` (TUI) and `opencode serve` (HTTP API) are different. Only **serve** works with `run` and `watch --execute`.
 
-Ralph/watch execute, upgrade pipeline, export/import, marketplace, Copilot bridge, TS plugins.
+`upgrade` refreshes host templates (`.opencode/`). It never overwrites team memory (`team.md`, decisions, knowledge).
+
+`upgrade --self` is not wired yet — rebuild with `go install ./cmd/squad-oc` (or `go build`).
+
+## Non-goals
+
+- Copilot CLI / Copilot SDK
+- Interactive Ink/`squad` shell (use the OpenCode TUI)
+- Aspire / .NET dashboard
+- npm as the primary distribution
+- Auto-spawning `opencode serve` from `run` (start it yourself)
+- Recast / generate agents from `.squad/` (not yet)
+- Overnight watch windows and git-notes backends
 
 ## Develop
 
