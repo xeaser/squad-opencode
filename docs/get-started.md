@@ -121,6 +121,7 @@ To refresh OpenCode agents/skills after a `squad-oc` update (team files stay put
 ```bash
 squad-oc upgrade --dry-run
 squad-oc upgrade
+squad-oc upgrade --self
 ```
 
 Validate:

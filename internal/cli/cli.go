@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,6 +15,7 @@ import (
 	"github.com/xeaser/squad-opencode/internal/doctor"
 	"github.com/xeaser/squad-opencode/internal/githubissues"
 	"github.com/xeaser/squad-opencode/internal/opencodeclient"
+	"github.com/xeaser/squad-opencode/internal/selfupdate"
 	"github.com/xeaser/squad-opencode/internal/share"
 	"github.com/xeaser/squad-opencode/internal/squad"
 	"github.com/xeaser/squad-opencode/internal/updatecheck"
@@ -88,7 +90,7 @@ Usage:
 
 Commands:
   init [--preset default] [--description <text>]
-  upgrade [--dry-run] [--force]
+  upgrade [--dry-run] [--force] [--self]
   doctor
   status | cast
   cast --add <name> [--role <role>]
@@ -299,8 +301,15 @@ func cmdUpgrade(args []string) int {
 		case "--force":
 			force = true
 		case "--self":
-			fmt.Println("upgrade --self is not wired yet. Build from source:")
-			fmt.Println("  go install github.com/xeaser/squad-opencode/cmd/squad-oc@latest")
+			msg, err := selfupdate.UpgradeSelf(nil, version.Repo, version.Version)
+			if err != nil && !errors.Is(err, selfupdate.ErrReplacedOnNextStart) {
+				fmt.Fprintln(os.Stderr, err)
+				return 1
+			}
+			fmt.Println(msg)
+			if errors.Is(err, selfupdate.ErrReplacedOnNextStart) {
+				fmt.Println("replaced on next start")
+			}
 			return 0
 		case "--help", "-h":
 			printHelp()

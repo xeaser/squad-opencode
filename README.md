@@ -49,7 +49,7 @@ OpenCode creates `.opencode/package.json` (`@opencode-ai/plugin`) and runs an in
 | Command | Role |
 |---------|------|
 | `init [--preset default] [--description <text>]` | Scaffold `.squad/` + `.opencode/` |
-| `upgrade [--dry-run] [--force]` | Refresh host templates; never wipe team state |
+| `upgrade [--dry-run] [--force] [--self]` | Refresh host templates; `--self` replaces this binary from GitHub Releases |
 | `doctor` | Health checks |
 | `status` / `cast` | Team table |
 | `cast --add <name> [--role <role>]` | Add a member and regenerate `.opencode/agents` |
@@ -95,7 +95,7 @@ squad-oc (Go)
 
 `upgrade` refreshes host templates (`.opencode/`). It never overwrites team memory (`team.md`, decisions, knowledge).
 
-`upgrade --self` is not wired yet — rebuild with `go install ./cmd/squad-oc` (or `go build`).
+`upgrade --self` downloads the latest GitHub Release for this OS/arch and replaces the running binary. On Windows, if the exe is locked, it writes `squad-oc.exe.new` beside it (`replaced on next start`).
 
 ### Share extra agents (`upstream` / `pack`)
 
@@ -166,7 +166,6 @@ During the quiet window it does not call `opencode serve`. Stop anytime with `to
 
 Not in this release:
 
-- **Release binaries** / a real `upgrade --self` (goreleaser for windows/linux/darwin)
 - **Agent traces** via OpenTelemetry GenAI (not Aspire). Goal: a self-contained `squad-oc traces` (or similar) plus export that any OTEL backend can scrape
 - Watch state backends (`git-notes`)
 
