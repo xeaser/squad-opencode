@@ -92,8 +92,8 @@ Commands:
   status | cast
   cast --add <name> [--role <role>]
   recast
-  run -p <prompt> | --file <path> [--agent name]   # needs: opencode serve
-  watch [--execute] [--interval minutes] [--once]
+  run -p <prompt> | --file <path> [--agent name] [--url]
+  watch [--execute] [--interval minutes] [--once] [--url]
       [--overnight-start HH:MM] [--overnight-end HH:MM]
   export [file]
   import <file>
@@ -336,7 +336,7 @@ func cmdUpgrade(args []string) int {
 }
 
 func cmdRun(args []string) int {
-	var prompt, file, agent string
+	var prompt, file, agent, apiURL string
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch {
@@ -349,6 +349,9 @@ func cmdRun(args []string) int {
 		case a == "--agent" && i+1 < len(args):
 			i++
 			agent = args[i]
+		case a == "--url" && i+1 < len(args):
+			i++
+			apiURL = args[i]
 		default:
 			fmt.Fprintf(os.Stderr, "Unknown run flag: %s\n", a)
 			return 2
@@ -373,13 +376,11 @@ func cmdRun(args []string) int {
 	if code != 0 {
 		return code
 	}
-	probe := opencodeclient.ProbeServer(context.Background(), "")
-	if !probe.Reachable {
-		fmt.Fprintf(os.Stderr, "OpenCode HTTP API not reachable at %s.\n%s\n\n%s\n",
-			opencodeclient.DefaultBaseURL, probe.Detail, opencodeclient.StartHelp)
-		return 1
+	ensured, code := ensureAPI(apiURL, root)
+	if code != 0 {
+		return code
 	}
-	res, err := (opencodeclient.SDKRunner{}).Run(context.Background(), opencodeclient.RunRequest{
+	res, err := (opencodeclient.SDKRunner{BaseURL: ensured.BaseURL}).Run(context.Background(), opencodeclient.RunRequest{
 		Directory: root, Agent: agent, Prompt: prompt, Title: "squad-oc run",
 	})
 	if err != nil {
@@ -394,7 +395,7 @@ func cmdWatch(args []string) int {
 	exec := false
 	once := false
 	interval := 10
-	var overnightStart, overnightEnd string
+	var overnightStart, overnightEnd, apiURL string
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch {
@@ -416,6 +417,9 @@ func cmdWatch(args []string) int {
 		case a == "--overnight-end" && i+1 < len(args):
 			i++
 			overnightEnd = args[i]
+		case a == "--url" && i+1 < len(args):
+			i++
+			apiURL = args[i]
 		default:
 			fmt.Fprintf(os.Stderr, "Unknown watch flag: %s\n", a)
 			return 2
@@ -435,7 +439,11 @@ func cmdWatch(args []string) int {
 		Lister:         githubissues.GHLister{Dir: root},
 	}
 	if exec {
-		opts.Runner = opencodeclient.SDKRunner{}
+		ensured, code := ensureAPI(apiURL, root)
+		if code != 0 {
+			return code
+		}
+		opts.Runner = opencodeclient.SDKRunner{BaseURL: ensured.BaseURL}
 	}
 	if once || !exec {
 		_, summary, err := watch.Pass(context.Background(), opts)
@@ -448,6 +456,16 @@ func cmdWatch(args []string) int {
 	}
 	fmt.Printf("watch loop every %d min (stop: touch .squad/ralph-stop)\n", interval)
 	return watchLoop(opts)
+}
+
+func ensureAPI(apiURL, root string) (opencodeclient.EnsureResult, int) {
+	res, err := opencodeclient.EnsureAPI(context.Background(), apiURL, root)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return res, 1
+	}
+	fmt.Println(res.Message)
+	return res, 0
 }
 
 func watchLoop(opts watch.Options) int {
