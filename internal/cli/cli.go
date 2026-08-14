@@ -10,14 +10,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/squad-opencode/squad-opencode/internal/doctor"
-	"github.com/squad-opencode/squad-opencode/internal/githubissues"
-	"github.com/squad-opencode/squad-opencode/internal/opencodeclient"
-	"github.com/squad-opencode/squad-opencode/internal/share"
-	"github.com/squad-opencode/squad-opencode/internal/squad"
-	"github.com/squad-opencode/squad-opencode/internal/updatecheck"
-	"github.com/squad-opencode/squad-opencode/internal/version"
-	"github.com/squad-opencode/squad-opencode/internal/watch"
+	"github.com/xeaser/squad-opencode/internal/doctor"
+	"github.com/xeaser/squad-opencode/internal/githubissues"
+	"github.com/xeaser/squad-opencode/internal/opencodeclient"
+	"github.com/xeaser/squad-opencode/internal/share"
+	"github.com/xeaser/squad-opencode/internal/squad"
+	"github.com/xeaser/squad-opencode/internal/updatecheck"
+	"github.com/xeaser/squad-opencode/internal/version"
+	"github.com/xeaser/squad-opencode/internal/watch"
 )
 
 // Execute is the CLI entry. Returns process exit code.

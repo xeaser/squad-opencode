@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/squad-opencode/squad-opencode/internal/cli"
+	"github.com/xeaser/squad-opencode/internal/cli"
 )
 
 func main() {

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/squad-opencode/squad-opencode/internal/opencodeclient"
-	"github.com/squad-opencode/squad-opencode/internal/squad"
+	"github.com/xeaser/squad-opencode/internal/opencodeclient"
+	"github.com/xeaser/squad-opencode/internal/squad"
 )
 
 // Issue is a work item (usually a GitHub issue).

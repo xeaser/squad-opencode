@@ -1,4 +1,4 @@
-module github.com/squad-opencode/squad-opencode
+module github.com/xeaser/squad-opencode
 
 go 1.22
 

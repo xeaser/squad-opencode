@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/squad-opencode/squad-opencode/internal/squad"
+	"github.com/xeaser/squad-opencode/internal/squad"
 )
 
 func TestUpstreamAndPack(t *testing.T) {

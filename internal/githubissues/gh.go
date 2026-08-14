@@ -9,7 +9,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/squad-opencode/squad-opencode/internal/watch"
+	"github.com/xeaser/squad-opencode/internal/watch"
 )
 
 // ParseListJSON parses `gh issue list --json number,title,state`.

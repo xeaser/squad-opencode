@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/squad-opencode/squad-opencode/internal/squad"
+	"github.com/xeaser/squad-opencode/internal/squad"
 )
 
 // Upstream is a named template source (local path or later a git URL).

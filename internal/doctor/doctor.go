@@ -9,8 +9,8 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/squad-opencode/squad-opencode/internal/opencodeclient"
-	"github.com/squad-opencode/squad-opencode/internal/squad"
+	"github.com/xeaser/squad-opencode/internal/opencodeclient"
+	"github.com/xeaser/squad-opencode/internal/squad"
 )
 
 // Check is one doctor row.

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/squad-opencode/squad-opencode/internal/version"
+	"github.com/xeaser/squad-opencode/internal/version"
 )
 
 func TestCheckNoReleases(t *testing.T) {

@@ -3,7 +3,7 @@ package doctor
 import (
 	"testing"
 
-	"github.com/squad-opencode/squad-opencode/internal/squad"
+	"github.com/xeaser/squad-opencode/internal/squad"
 )
 
 func TestRunChecksNotInitialized(t *testing.T) {

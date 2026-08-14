@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/squad-opencode/squad-opencode/internal/version"
+	"github.com/xeaser/squad-opencode/internal/version"
 )
 
 // Result is local vs latest release.
