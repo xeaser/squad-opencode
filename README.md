@@ -1,5 +1,8 @@
 # squad-opencode
 
+[![CI](https://github.com/xeaser/squad-opencode/actions/workflows/ci.yml/badge.svg)](https://github.com/xeaser/squad-opencode/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/xeaser/squad-opencode?display_name=tag)](https://github.com/xeaser/squad-opencode/releases/latest)
+
 **Human-led AI agent teams for [OpenCode](https://opencode.ai)** — implemented in **Go**.
 
 One binary scaffolds a persistent team in your repo (`.squad/`) and OpenCode agents (`.opencode/`). You coordinate work; specialists (Lead, Frontend, Backend, Tester) run as OpenCode agents.
