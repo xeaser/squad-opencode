@@ -159,9 +159,14 @@ The script builds `squad-oc.exe`, inits `D:\xAI\squad-oc-dummy` if needed, start
 
 ## Also useful
 
+- `squad-oc init --global` (and `upgrade --global`) for a personal team outside the repo
 - `squad-oc cast --add Designer --role Design` then OpenCode sees `@designer` after recast
+- `squad-oc cast --remove Tester` drops a member and recasts agents
+- `squad-oc import snapshot.json --with-host` restores `.squad/` plus host agents
 - `squad-oc link ~/teams/platform` to share one `.squad/` across repos (`link --off` to detach)
+- `squad-oc watch --health` prints the last Ralph snapshot
 - `squad-oc watch --execute --overnight-start 18:00 --overnight-end 08:00`
+- `squad-oc traces` lists local run/watch spans (`--export` writes OTLP JSON)
 - `squad-oc run -p "…"` starts `opencode serve` on `127.0.0.1:4096` if nothing is there; a custom `--url` never auto-starts
 - `squad-oc pack <path|git-url>` or `squad-oc upstream add <name> <path|git-url>` to pull extra agents/skills (see README)
 

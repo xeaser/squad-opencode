@@ -1,3 +1,5 @@
+// Package watch polls issues (Ralph): overnight windows, health snapshots,
+// notify, escalation, and optional git state backends.
 package watch
 
 import (

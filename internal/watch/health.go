@@ -11,7 +11,7 @@ import (
 	"github.com/xeaser/squad-opencode/internal/squad"
 )
 
-// Health is the live watch snapshot written to ralph-status.json.
+// Health is the live watch snapshot written to ralph-status.json (and optional state backends).
 type Health struct {
 	PID         int       `json:"pid"`
 	StartedAt   time.Time `json:"startedAt"`

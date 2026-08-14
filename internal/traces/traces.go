@@ -27,7 +27,7 @@ type Span struct {
 	Attributes map[string]string `json:"attributes"`
 }
 
-// Dir is ResolveDir + "traces".
+// Dir is the traces folder under the resolved team directory.
 func Dir(projectRoot string) string {
 	return filepath.Join(squad.ResolveDir(projectRoot), "traces")
 }

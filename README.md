@@ -48,15 +48,15 @@ OpenCode creates `.opencode/package.json` (`@opencode-ai/plugin`) and runs an in
 
 | Command | Role |
 |---------|------|
-| `init [--preset default] [--description <text>]` | Scaffold `.squad/` + `.opencode/` |
-| `upgrade [--dry-run] [--force] [--self]` | Refresh host templates; `--self` replaces this binary from GitHub Releases |
-| `doctor` | Health checks |
+| `init [--preset default] [--description <text>] [--global]` | Scaffold `.squad/` + `.opencode/` (`--global` uses the user config dir) |
+| `upgrade [--dry-run] [--force] [--global] [--self]` | Refresh host templates; `--self` replaces this binary from GitHub Releases |
+| `doctor` / `heartbeat` | Health checks |
 | `status` / `cast` | Team table |
 | `cast --add <name> [--role <role>]` | Add a member and regenerate `.opencode/agents` |
 | `cast --remove <name>` | Remove a member and regenerate `.opencode/agents` |
 | `recast` | Regenerate `.opencode/agents` from `.squad/team.md` |
 | `run -p <prompt>` / `--file <path> [--agent name] [--url]` | Prompt the OpenCode HTTP API as `squad`; auto-starts `opencode serve` on :4096 only |
-| `watch [--execute] [--interval minutes] [--once] [--url] [--overnight-start HH:MM] [--overnight-end HH:MM]` | Issue triage (Ralph); execute uses `run` |
+| `watch` / `triage` / `loop` `[--execute] [--interval minutes] [--once] [--health] [--url] [--overnight-start HH:MM] [--overnight-end HH:MM] [--label name] [--log-file path] [--verbose] [--notify-level all\|important\|none] [--state-backend memory\|git-notes\|orphan-branch]` | Issue triage (Ralph); `--execute` uses `run` |
 | `export [file]` / `import <file> [--with-host]` | JSON snapshot of `.squad/` (optional host files) |
 | `externalize [--key name]` / `internalize` | Move *this* project's team out of the worktree |
 | `nap [--dry-run] [--deep]` / `scrub-emails [directory]` | Context and PII hygiene |
@@ -64,6 +64,7 @@ OpenCode creates `.opencode/package.json` (`@opencode-ai/plugin`) and runs an in
 | `pack <path\|git-url>` | One-shot pull of extra agents/skills |
 | `link <team-dir>` / `link --off` | Share one team directory across several repos |
 | `update-check [--json] [--refresh]` | Prints `up to date` or `update available` vs GitHub latest tag |
+| `traces [--last N] [--json] [--export file]` | Local `run` / `watch` spans; `--export` writes OTLP JSON |
 | `help` / `version` | Usage and version string |
 
 ## Layout
@@ -73,9 +74,11 @@ cmd/squad-oc/            # main → internal/cli
 internal/cli/            # commands
 internal/squad/          # init, upgrade, export, externalize, nap, scrub, templates
 internal/opencodeclient/ # SDK + run (needs `opencode serve`)
-internal/watch/          # issue triage (Ralph)
+internal/watch/          # issue triage (Ralph): health, overnight, backends
 internal/githubissues/   # gh issue list
 internal/share/          # upstream / pack / link
+internal/traces/         # local JSONL spans + OTLP export
+internal/selfupdate/     # upgrade --self
 internal/updatecheck/
 internal/version/
 docs/
@@ -96,6 +99,8 @@ squad-oc (Go)
 `upgrade` refreshes host templates (`.opencode/`). It never overwrites team memory (`team.md`, decisions, knowledge).
 
 `upgrade --self` downloads the latest GitHub Release for this OS/arch and replaces the running binary. On Windows, if the exe is locked, it writes `squad-oc.exe.new` beside it (`replaced on next start`).
+
+`traces` lists local spans from `run` and `watch --execute`. `--export file` writes OTLP JSON any collector can ingest.
 
 ### Share extra agents (`upstream` / `pack`)
 
@@ -141,11 +146,14 @@ squad-oc link --off                     # this repo uses its local .squad/ again
 
 `link` does not move files. Config stays in each repo; `team.md` / charters / decisions are read from the shared directory. Cannot combine with `externalize` (that *moves* this project's own team out of the worktree).
 
-### Change the cast (`cast --add` / `recast`)
+### Change the cast (`cast --add` / `cast --remove` / `recast`)
 
 ```bash
 squad-oc cast --add Designer --role Design
 # appends Designer to team.md, writes charter/knowledge, regenerates .opencode/agents
+
+squad-oc cast --remove Designer
+# drops the member and regenerates .opencode/agents
 
 # or edit .squad/team.md by hand, then:
 squad-oc recast
@@ -162,12 +170,7 @@ squad-oc watch --execute --interval 10 --overnight-start 18:00 --overnight-end 0
 
 During the quiet window it does not call `opencode serve`. Stop anytime with `touch .squad/ralph-stop`.
 
-## Later
-
-Not in this release:
-
-- **Agent traces** via OpenTelemetry GenAI (not Aspire). Goal: a self-contained `squad-oc traces` (or similar) plus export that any OTEL backend can scrape
-- Watch state backends (`git-notes`)
+`watch --health` prints the last `ralph-status.json` snapshot. `--state-backend git-notes` or `orphan-branch` persists that snapshot across restarts (default is the local file).
 
 ## Non-goals
 
@@ -175,7 +178,7 @@ Original-Squad / Copilot-host pieces we are not building:
 
 - GitHub Copilot CLI / Copilot SDK
 - Interactive Ink/`squad` shell (use the OpenCode TUI)
-- Aspire / .NET dashboard (traces, if any, will be OTEL)
+- Aspire / .NET dashboard (traces are local OTLP JSON, not Aspire)
 
 ## Develop
 

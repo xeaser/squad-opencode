@@ -16,7 +16,7 @@ type StateBackend interface {
 	Save(ctx context.Context, h Health) error
 }
 
-// MemoryBackend holds Health in process (tests / default companion to ralph-status.json).
+// MemoryBackend holds Health in process (tests). Default CLI persistence is ralph-status.json.
 type MemoryBackend struct{ H Health }
 
 // Load implements StateBackend.
