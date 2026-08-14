@@ -40,6 +40,9 @@ func TestAliasDispatch(t *testing.T) {
 	if code := Execute([]string{"loop", "--once"}); code == 2 {
 		t.Fatal("loop should not be unknown")
 	}
+	if code := Execute([]string{"watch", "--label", "bug", "--once"}); code == 2 {
+		t.Fatal("--label should not be unknown")
+	}
 }
 
 func TestInitExportImportViaCLI(t *testing.T) {

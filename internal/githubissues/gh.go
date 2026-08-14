@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 
 	"github.com/xeaser/squad-opencode/internal/watch"
@@ -21,14 +22,31 @@ func ParseListJSON(data []byte) ([]watch.Issue, error) {
 	return issues, nil
 }
 
-// GHLister runs gh issue list.
+// GHLister runs `gh issue list` (already open issues only; no --assignee).
 type GHLister struct {
-	Dir string
+	Dir    string
+	Labels []string // --label, repeatable; passed to `gh issue list --label`
+	Limit  int      // default 20
+}
+
+func (g GHLister) args() []string {
+	limit := g.Limit
+	if limit <= 0 {
+		limit = 20
+	}
+	args := []string{"issue", "list", "--json", "number,title,state", "--limit", strconv.Itoa(limit)}
+	for _, label := range g.Labels {
+		if label == "" {
+			continue
+		}
+		args = append(args, "--label", label)
+	}
+	return args
 }
 
 // List implements watch.IssueLister.
 func (g GHLister) List(ctx context.Context) ([]watch.Issue, error) {
-	cmd := exec.CommandContext(ctx, "gh", "issue", "list", "--json", "number,title,state", "--limit", "20")
+	cmd := exec.CommandContext(ctx, "gh", g.args()...)
 	if g.Dir != "" {
 		cmd.Dir = g.Dir
 	}

@@ -25,6 +25,13 @@ func TestBuildContextAndPass(t *testing.T) {
 	if !strings.Contains(ctxText, "#7") || !strings.Contains(ctxText, "Lead") {
 		t.Fatal(ctxText)
 	}
+	labeled, err := BuildContext(root, issues, "bug")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(labeled, "bug") {
+		t.Fatal(labeled)
+	}
 
 	fake := &opencodeclient.FakeRunner{}
 	ok, summary, err := Pass(context.Background(), Options{

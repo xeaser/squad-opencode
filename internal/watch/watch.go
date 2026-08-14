@@ -46,6 +46,7 @@ type Options struct {
 	Now            func() time.Time
 	Runner         opencodeclient.Runner
 	Lister         IssueLister
+	Labels         []string
 }
 
 // StopPath is the graceful-stop sentinel.
@@ -54,7 +55,8 @@ func StopPath(projectRoot string) string {
 }
 
 // BuildContext renders a prompt from team state + issues.
-func BuildContext(projectRoot string, issues []Issue) (string, error) {
+// Optional labels are listed as a filter (gh already returns open issues).
+func BuildContext(projectRoot string, issues []Issue, labels ...string) (string, error) {
 	var b strings.Builder
 	b.WriteString("# Squad watch context\n\n")
 	members, err := squad.ReadTeam(projectRoot)
@@ -64,6 +66,12 @@ func BuildContext(projectRoot string, issues []Issue) (string, error) {
 	b.WriteString("## Team\n")
 	for _, m := range members {
 		fmt.Fprintf(&b, "- %s (%s) [%s]\n", m.Name, m.Role, m.Status)
+	}
+	if len(labels) > 0 {
+		b.WriteString("\n## Label filter\n")
+		for _, label := range labels {
+			fmt.Fprintf(&b, "- %s\n", label)
+		}
 	}
 	b.WriteString("\n## Issues\n")
 	if len(issues) == 0 {
@@ -145,7 +153,7 @@ func Pass(ctx context.Context, opts Options) (executed bool, summary string, err
 	if err != nil {
 		return false, "", err
 	}
-	ctxText, err := BuildContext(opts.ProjectRoot, issues)
+	ctxText, err := BuildContext(opts.ProjectRoot, issues, opts.Labels...)
 	if err != nil {
 		return false, "", err
 	}
