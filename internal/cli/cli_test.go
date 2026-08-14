@@ -43,6 +43,12 @@ func TestAliasDispatch(t *testing.T) {
 	if code := Execute([]string{"watch", "--label", "bug", "--once"}); code == 2 {
 		t.Fatal("--label should not be unknown")
 	}
+	if code := Execute([]string{"watch", "--notify-level", "none", "--once"}); code == 2 {
+		t.Fatal("--notify-level should not be unknown")
+	}
+	if Execute([]string{"watch", "--notify-level", "nope"}) != 2 {
+		t.Fatal("invalid --notify-level should be 2")
+	}
 }
 
 func TestInitExportImportViaCLI(t *testing.T) {

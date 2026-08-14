@@ -2,6 +2,7 @@ package watch
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -262,5 +263,81 @@ func TestLoopSetsPIDOnFirstWrite(t *testing.T) {
 	}
 	if h.NextPoll.IsZero() {
 		t.Fatal("nextPoll")
+	}
+}
+
+func TestNotifyNoneSkipsTriageDump(t *testing.T) {
+	root := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	var logs []string
+	_, _, err := Pass(context.Background(), Options{
+		ProjectRoot: root,
+		Execute:     false,
+		Lister:      StaticLister{Issues: []Issue{{Number: 1, Title: "x", State: "OPEN"}}},
+		Notify:      NotifyNone,
+		Logger: func(_ NotifyLevel, msg string) {
+			logs = append(logs, msg)
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, msg := range logs {
+		if strings.Contains(msg, "#1") || strings.Contains(msg, "Issues") {
+			t.Fatalf("triage dump logged under NotifyNone: %q", msg)
+		}
+	}
+}
+
+func TestNotifyImportantLogsExecuteError(t *testing.T) {
+	root := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	var logs []string
+	_, _, err := Pass(context.Background(), Options{
+		ProjectRoot: root,
+		Execute:     true,
+		Lister:      StaticLister{Issues: []Issue{{Number: 1, Title: "x", State: "OPEN"}}},
+		Runner:      &opencodeclient.FakeRunner{Err: errors.New("boom")},
+		Notify:      NotifyImportant,
+		Logger: func(_ NotifyLevel, msg string) {
+			logs = append(logs, msg)
+		},
+	})
+	if err == nil {
+		t.Fatal("want execute error")
+	}
+	joined := strings.Join(logs, "\n")
+	if !strings.Contains(joined, "boom") {
+		t.Fatalf("expected execute error in logs: %v", logs)
+	}
+}
+
+func TestLogFileAppends(t *testing.T) {
+	root := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	logPath := filepath.Join(root, "nested", "watch.log")
+	_, _, err := Pass(context.Background(), Options{
+		ProjectRoot: root,
+		Execute:     true,
+		Lister:      StaticLister{Issues: []Issue{{Number: 1, Title: "x", State: "OPEN"}}},
+		Runner:      &opencodeclient.FakeRunner{Err: errors.New("boom")},
+		Notify:      NotifyImportant,
+		LogFile:     logPath,
+	})
+	if err == nil {
+		t.Fatal("want execute error")
+	}
+	data, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "boom") {
+		t.Fatalf("log file: %s", data)
 	}
 }

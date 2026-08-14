@@ -47,6 +47,72 @@ type Options struct {
 	Runner         opencodeclient.Runner
 	Lister         IssueLister
 	Labels         []string
+	LogFile        string
+	Verbose        bool
+	Notify         NotifyLevel
+	Logger         func(level NotifyLevel, msg string)
+}
+
+// NotifyLevel selects which watch lines are emitted.
+type NotifyLevel int
+
+const (
+	NotifyAll NotifyLevel = iota
+	NotifyImportant
+	NotifyNone
+)
+
+// ParseNotifyLevel maps all|important|none (default important).
+func ParseNotifyLevel(s string) (NotifyLevel, error) {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "", "important":
+		return NotifyImportant, nil
+	case "all":
+		return NotifyAll, nil
+	case "none":
+		return NotifyNone, nil
+	default:
+		return NotifyImportant, fmt.Errorf("invalid --notify-level %q (want all|important|none)", s)
+	}
+}
+
+func passesNotify(opts Options, level NotifyLevel) bool {
+	switch opts.Notify {
+	case NotifyNone:
+		return opts.Verbose && level == NotifyAll
+	case NotifyAll:
+		return true
+	default:
+		return level == NotifyImportant
+	}
+}
+
+func notify(opts Options, level NotifyLevel, msg string) {
+	if !passesNotify(opts, level) {
+		return
+	}
+	if opts.Logger != nil {
+		opts.Logger(level, msg)
+	}
+	if opts.LogFile != "" {
+		_ = appendLog(opts.LogFile, msg)
+	}
+}
+
+func appendLog(path, msg string) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	if !strings.HasSuffix(msg, "\n") {
+		msg += "\n"
+	}
+	_, err = f.WriteString(msg)
+	return err
 }
 
 // StopPath is the graceful-stop sentinel.
@@ -139,31 +205,56 @@ func clockNow(opts Options) time.Time {
 // Pass runs one poll cycle. Returns whether execute ran.
 func Pass(ctx context.Context, opts Options) (executed bool, summary string, err error) {
 	defer func() { writePassHealth(opts, summary, err) }()
+	prevOvernight := false
+	if h, rerr := ReadHealth(opts.ProjectRoot); rerr == nil {
+		prevOvernight = h.Overnight
+	}
 	quiet, err := InOvernight(clockNow(opts), opts.OvernightStart, opts.OvernightEnd)
+	if opts.Verbose {
+		notify(opts, NotifyAll, fmt.Sprintf("overnight check: quiet=%v", quiet))
+	}
 	if err != nil {
+		notify(opts, NotifyImportant, "overnight error: "+err.Error())
 		return false, "", err
 	}
 	if quiet {
-		return false, "overnight quiet until " + opts.OvernightEnd, nil
+		summary = "overnight quiet until " + opts.OvernightEnd
+		if !prevOvernight {
+			notify(opts, NotifyImportant, "overnight enter until "+opts.OvernightEnd)
+		}
+		return false, summary, nil
+	}
+	if prevOvernight {
+		notify(opts, NotifyImportant, "overnight exit")
 	}
 	if opts.Lister == nil {
-		return false, "", fmt.Errorf("no issue lister")
+		err = fmt.Errorf("no issue lister")
+		notify(opts, NotifyImportant, err.Error())
+		return false, "", err
 	}
 	issues, err := opts.Lister.List(ctx)
 	if err != nil {
+		notify(opts, NotifyImportant, "list error: "+err.Error())
 		return false, "", err
 	}
 	ctxText, err := BuildContext(opts.ProjectRoot, issues, opts.Labels...)
 	if err != nil {
+		notify(opts, NotifyImportant, "context error: "+err.Error())
 		return false, "", err
 	}
 	summary = fmt.Sprintf("issues=%d execute=%v", len(issues), opts.Execute)
 	if !opts.Execute {
+		if opts.Notify == NotifyAll {
+			notify(opts, NotifyAll, ctxText)
+		}
 		return false, summary + "\n" + ctxText, nil
 	}
 	if opts.Runner == nil {
-		return false, "", fmt.Errorf("execute requires a runner")
+		err = fmt.Errorf("execute requires a runner")
+		notify(opts, NotifyImportant, err.Error())
+		return false, "", err
 	}
+	notify(opts, NotifyImportant, "execute started")
 	res, err := opts.Runner.Run(ctx, opencodeclient.RunRequest{
 		Directory: opts.ProjectRoot,
 		Agent:     "squad",
@@ -171,8 +262,10 @@ func Pass(ctx context.Context, opts Options) (executed bool, summary string, err
 		Title:     "squad-oc watch",
 	})
 	if err != nil {
+		notify(opts, NotifyImportant, "execute error: "+err.Error())
 		return false, summary, err
 	}
+	notify(opts, NotifyImportant, "execute finished")
 	return true, summary + "\n" + res.Text, nil
 }
 
@@ -217,6 +310,7 @@ func Loop(ctx context.Context, opts Options) error {
 	}
 	for {
 		if _, err := os.Stat(StopPath(opts.ProjectRoot)); err == nil {
+			notify(opts, NotifyImportant, "stop sentinel")
 			return nil
 		}
 		_, _, err := Pass(ctx, opts)
@@ -238,6 +332,9 @@ func Loop(ctx context.Context, opts Options) error {
 		}
 		if opts.Once {
 			return nil
+		}
+		if opts.Verbose {
+			notify(opts, NotifyAll, "sleep "+opts.Interval.String())
 		}
 		select {
 		case <-ctx.Done():

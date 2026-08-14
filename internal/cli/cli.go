@@ -99,6 +99,7 @@ Commands:
   run -p <prompt> | --file <path> [--agent name] [--url]
   watch | triage | loop [--execute] [--interval minutes] [--once] [--health] [--url]
       [--overnight-start HH:MM] [--overnight-end HH:MM] [--label name]
+      [--log-file path] [--verbose] [--notify-level all|important|none]
   export [file]
   import <file> [--with-host]
   externalize [--key name]
@@ -419,7 +420,9 @@ func cmdWatch(args []string) int {
 	once := false
 	health := false
 	interval := 10
-	var overnightStart, overnightEnd, apiURL string
+	verbose := false
+	notifyLevel := watch.NotifyImportant
+	var overnightStart, overnightEnd, apiURL, logFile string
 	var labels []string
 	for i := 0; i < len(args); i++ {
 		a := args[i]
@@ -430,6 +433,8 @@ func cmdWatch(args []string) int {
 			once = true
 		case a == "--health":
 			health = true
+		case a == "--verbose":
+			verbose = true
 		case a == "--interval" && i+1 < len(args):
 			i++
 			n, err := strconv.Atoi(args[i])
@@ -450,6 +455,17 @@ func cmdWatch(args []string) int {
 		case a == "--label" && i+1 < len(args):
 			i++
 			labels = append(labels, args[i])
+		case a == "--log-file" && i+1 < len(args):
+			i++
+			logFile = args[i]
+		case a == "--notify-level" && i+1 < len(args):
+			i++
+			lvl, err := watch.ParseNotifyLevel(args[i])
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				return 2
+			}
+			notifyLevel = lvl
 		default:
 			fmt.Fprintf(os.Stderr, "Unknown watch flag: %s\n", a)
 			return 2
@@ -470,7 +486,13 @@ func cmdWatch(args []string) int {
 		OvernightStart: overnightStart,
 		OvernightEnd:   overnightEnd,
 		Labels:         labels,
-		Lister:         githubissues.GHLister{Dir: root, Labels: labels},
+		LogFile:        logFile,
+		Verbose:        verbose,
+		Notify:         notifyLevel,
+		Logger: func(_ watch.NotifyLevel, msg string) {
+			fmt.Println(msg)
+		},
+		Lister: githubissues.GHLister{Dir: root, Labels: labels},
 	}
 	if exec {
 		ensured, code := ensureAPI(apiURL, root)
