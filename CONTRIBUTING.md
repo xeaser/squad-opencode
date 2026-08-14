@@ -1,6 +1,6 @@
 # Contributing to squad-opencode
 
-Public repo. MIT. Changes land through **pull requests** on the default branch (`master` today). Maintainers with admin can push or merge without a review when they need to; everyone else needs a PR and **one approval that is not their own**.
+Public repo. MIT. Changes land through **pull requests** on the default branch (`main`). Maintainers with admin can push or merge without a review when they need to; everyone else needs a PR and **one approval that is not their own**.
 
 GitHub already blocks you from approving your own PR. That is the “not self” rule.
 

@@ -5,7 +5,7 @@ labels: ["enhancement"]
 body:
   - type: markdown
     attributes:
-      value: Check [CONTRIBUTING.md](https://github.com/xeaser/squad-opencode/blob/master/CONTRIBUTING.md) non-goals before asking for Copilot, Ink shell, Aspire, or npm.
+      value: Check [CONTRIBUTING.md](https://github.com/xeaser/squad-opencode/blob/main/CONTRIBUTING.md) non-goals before asking for Copilot, Ink shell, Aspire, or npm.
   - type: textarea
     id: problem
     attributes:
