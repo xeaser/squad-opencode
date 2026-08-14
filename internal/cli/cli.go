@@ -94,6 +94,7 @@ Commands:
   recast
   run -p <prompt> | --file <path> [--agent name]   # needs: opencode serve
   watch [--execute] [--interval minutes] [--once]
+      [--overnight-start HH:MM] [--overnight-end HH:MM]
   export [file]
   import <file>
   externalize [--key name]
@@ -393,6 +394,7 @@ func cmdWatch(args []string) int {
 	exec := false
 	once := false
 	interval := 10
+	var overnightStart, overnightEnd string
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch {
@@ -408,6 +410,12 @@ func cmdWatch(args []string) int {
 				return 2
 			}
 			interval = n
+		case a == "--overnight-start" && i+1 < len(args):
+			i++
+			overnightStart = args[i]
+		case a == "--overnight-end" && i+1 < len(args):
+			i++
+			overnightEnd = args[i]
 		default:
 			fmt.Fprintf(os.Stderr, "Unknown watch flag: %s\n", a)
 			return 2
@@ -418,11 +426,13 @@ func cmdWatch(args []string) int {
 		return code
 	}
 	opts := watch.Options{
-		ProjectRoot: root,
-		Execute:     exec,
-		Once:        once,
-		Interval:    time.Duration(interval) * time.Minute,
-		Lister:      githubissues.GHLister{Dir: root},
+		ProjectRoot:    root,
+		Execute:        exec,
+		Once:           once,
+		Interval:       time.Duration(interval) * time.Minute,
+		OvernightStart: overnightStart,
+		OvernightEnd:   overnightEnd,
+		Lister:         githubissues.GHLister{Dir: root},
 	}
 	if exec {
 		opts.Runner = opencodeclient.SDKRunner{}

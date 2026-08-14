@@ -37,12 +37,15 @@ func (s StaticLister) List(context.Context) ([]Issue, error) {
 
 // Options control a watch pass.
 type Options struct {
-	ProjectRoot string
-	Execute     bool
-	Interval    time.Duration
-	Once        bool
-	Runner      opencodeclient.Runner
-	Lister      IssueLister
+	ProjectRoot    string
+	Execute        bool
+	Interval       time.Duration
+	Once           bool
+	OvernightStart string // HH:MM local, e.g. "18:00"
+	OvernightEnd   string // HH:MM local, e.g. "08:00"
+	Now            func() time.Time
+	Runner         opencodeclient.Runner
+	Lister         IssueLister
 }
 
 // StopPath is the graceful-stop sentinel.
@@ -82,8 +85,58 @@ func BuildContext(projectRoot string, issues []Issue) (string, error) {
 	return b.String(), nil
 }
 
+// InOvernight reports whether now falls in the [start, end) quiet window.
+// A window with start > end crosses midnight (18:00–08:00).
+func InOvernight(now time.Time, start, end string) (bool, error) {
+	start, end = strings.TrimSpace(start), strings.TrimSpace(end)
+	if start == "" && end == "" {
+		return false, nil
+	}
+	if start == "" || end == "" {
+		return false, fmt.Errorf("overnight needs both start and end (HH:MM)")
+	}
+	s, err := parseClock(start)
+	if err != nil {
+		return false, err
+	}
+	e, err := parseClock(end)
+	if err != nil {
+		return false, err
+	}
+	if s == e {
+		return false, nil
+	}
+	n := now.Hour()*60 + now.Minute()
+	if s < e {
+		return n >= s && n < e, nil
+	}
+	return n >= s || n < e, nil
+}
+
+func parseClock(s string) (int, error) {
+	var h, m int
+	if _, err := fmt.Sscanf(s, "%d:%d", &h, &m); err != nil || h < 0 || h > 23 || m < 0 || m > 59 {
+		return 0, fmt.Errorf("invalid time %q (want HH:MM)", s)
+	}
+	return h*60 + m, nil
+}
+
+func clockNow(opts Options) time.Time {
+	if opts.Now != nil {
+		return opts.Now()
+	}
+	return time.Now()
+}
+
 // Pass runs one poll cycle. Returns whether execute ran.
 func Pass(ctx context.Context, opts Options) (executed bool, summary string, err error) {
+	quiet, err := InOvernight(clockNow(opts), opts.OvernightStart, opts.OvernightEnd)
+	if err != nil {
+		return false, "", err
+	}
+	if quiet {
+		return false, "overnight quiet until " + opts.OvernightEnd, nil
+	}
 	if opts.Lister == nil {
 		return false, "", fmt.Errorf("no issue lister")
 	}
