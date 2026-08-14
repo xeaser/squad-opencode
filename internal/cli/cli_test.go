@@ -73,6 +73,60 @@ func TestRunRequiresPrompt(t *testing.T) {
 	}
 }
 
+func isolateHome(t *testing.T) string {
+	t.Helper()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	return home
+}
+
+func TestInitUpgradeGlobalViaCLI(t *testing.T) {
+	home := isolateHome(t)
+	cwd := t.TempDir()
+	prev, _ := os.Getwd()
+	if err := os.Chdir(cwd); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(prev) })
+
+	if code := Execute([]string{"init", "--global", "--description", "personal"}); code != 0 {
+		t.Fatal("init --global")
+	}
+	root := filepath.Join(home, ".squad-oc", "global")
+	team := filepath.Join(root, ".squad", "team.md")
+	b, err := os.ReadFile(team)
+	if err != nil || !strings.Contains(string(b), "personal") {
+		t.Fatalf("global team.md: %v %s", err, b)
+	}
+	if _, err := os.Stat(filepath.Join(cwd, ".squad", "config.json")); !os.IsNotExist(err) {
+		t.Fatal("init --global must not write into cwd")
+	}
+
+	agent := filepath.Join(root, ".opencode", "agents", "squad.md")
+	if err := os.WriteFile(agent, []byte("MUTATED\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if code := Execute([]string{"upgrade", "--global"}); code != 0 {
+		t.Fatal("upgrade --global")
+	}
+	got, err := os.ReadFile(agent)
+	if err != nil || string(got) == "MUTATED\n" || !strings.Contains(string(got), "You are **Squad**") {
+		t.Fatalf("upgrade --global did not restore host: %v %s", err, got)
+	}
+	after, _ := os.ReadFile(team)
+	if string(after) != string(b) {
+		t.Fatal("upgrade --global must leave team.md")
+	}
+}
+
+func TestUpgradeGlobalRequiresInit(t *testing.T) {
+	isolateHome(t)
+	if Execute([]string{"upgrade", "--global"}) == 0 {
+		t.Fatal("upgrade --global without init should fail")
+	}
+}
+
 func TestCastRemoveViaCLI(t *testing.T) {
 	root := t.TempDir()
 	prev, _ := os.Getwd()

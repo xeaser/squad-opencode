@@ -87,8 +87,8 @@ Usage:
   squad-oc <command> [options]
 
 Commands:
-  init [--preset default] [--description <text>]
-  upgrade [--dry-run] [--force]
+  init [--preset default] [--description <text>] [--global]
+  upgrade [--dry-run] [--force] [--global]
   doctor
   status | cast
   cast --add <name> [--role <role>]
@@ -128,6 +128,7 @@ func cmdInit(args []string) int {
 	preset := "default"
 	var description string
 	interactive := true
+	global := false
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch {
@@ -143,6 +144,8 @@ func cmdInit(args []string) int {
 			i++
 			description = args[i]
 			interactive = false
+		case a == "--global":
+			global = true
 		case a == "--help" || a == "-h":
 			printHelp()
 			return 0
@@ -166,7 +169,7 @@ func cmdInit(args []string) int {
 		description = strings.TrimSpace(line)
 	}
 	result, err := squad.WriteDefaultPreset(squad.InitOptions{
-		ProjectRoot: root, Preset: preset, ProjectDescription: description,
+		ProjectRoot: root, Preset: preset, ProjectDescription: description, Global: global,
 	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -174,6 +177,9 @@ func cmdInit(args []string) int {
 	}
 	fmt.Println(result.Message)
 	if result.AlreadyInitialized {
+		if global {
+			fmt.Println(result.ProjectRoot)
+		}
 		return 0
 	}
 	fmt.Printf("Project: %s\nFiles written: %d\n", result.ProjectRoot, len(result.FilesWritten))
@@ -291,13 +297,15 @@ func cmdRecast() int {
 }
 
 func cmdUpgrade(args []string) int {
-	dry, force := false, false
+	dry, force, global := false, false, false
 	for _, a := range args {
 		switch a {
 		case "--dry-run":
 			dry = true
 		case "--force":
 			force = true
+		case "--global":
+			global = true
 		case "--self":
 			fmt.Println("upgrade --self is not wired yet. Build from source:")
 			fmt.Println("  go install github.com/xeaser/squad-opencode/cmd/squad-oc@latest")
@@ -314,8 +322,20 @@ func cmdUpgrade(args []string) int {
 	if code != 0 {
 		return code
 	}
+	if global {
+		g, err := squad.GlobalSquadDir()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		root = g
+	}
 	res, err := squad.UpgradeHostFiles(squad.UpgradeOptions{ProjectRoot: root, DryRun: dry, Force: force})
 	if err != nil {
+		if global && !squad.IsInitialized(root) {
+			fmt.Fprintln(os.Stderr, "not initialized — run: squad-oc init --global")
+			return 1
+		}
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
