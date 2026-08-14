@@ -130,6 +130,7 @@ func clockNow(opts Options) time.Time {
 
 // Pass runs one poll cycle. Returns whether execute ran.
 func Pass(ctx context.Context, opts Options) (executed bool, summary string, err error) {
+	defer func() { writePassHealth(opts, summary, err) }()
 	quiet, err := InOvernight(clockNow(opts), opts.OvernightStart, opts.OvernightEnd)
 	if err != nil {
 		return false, "", err
@@ -167,16 +168,63 @@ func Pass(ctx context.Context, opts Options) (executed bool, summary string, err
 	return true, summary + "\n" + res.Text, nil
 }
 
+func writePassHealth(opts Options, summary string, err error) {
+	if opts.ProjectRoot == "" {
+		return
+	}
+	now := clockNow(opts)
+	h, rerr := ReadHealth(opts.ProjectRoot)
+	if rerr != nil && !os.IsNotExist(rerr) {
+		return
+	}
+	h.LastPoll = now
+	h.LastSummary = firstLine(summary)
+	h.Round++
+	if err != nil {
+		h.LastError = err.Error()
+		h.Consecutive++
+	} else {
+		h.LastError = ""
+		h.Consecutive = 0
+	}
+	quiet, _ := InOvernight(now, opts.OvernightStart, opts.OvernightEnd)
+	h.Overnight = quiet
+	_ = WriteHealth(opts.ProjectRoot, h)
+}
+
 // Loop polls until stop sentinel, context cancel, or Once.
 func Loop(ctx context.Context, opts Options) error {
 	if opts.Interval <= 0 {
 		opts.Interval = 10 * time.Minute
+	}
+	now := clockNow(opts)
+	h, err := ReadHealth(opts.ProjectRoot)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	h.PID = os.Getpid()
+	h.StartedAt = now
+	if err := WriteHealth(opts.ProjectRoot, h); err != nil {
+		return err
 	}
 	for {
 		if _, err := os.Stat(StopPath(opts.ProjectRoot)); err == nil {
 			return nil
 		}
 		_, _, err := Pass(ctx, opts)
+		now = clockNow(opts)
+		h, rerr := ReadHealth(opts.ProjectRoot)
+		if rerr != nil && !os.IsNotExist(rerr) {
+			return rerr
+		}
+		h.PID = os.Getpid()
+		if h.StartedAt.IsZero() {
+			h.StartedAt = now
+		}
+		h.NextPoll = now.Add(opts.Interval)
+		if werr := WriteHealth(opts.ProjectRoot, h); werr != nil {
+			return werr
+		}
 		if err != nil {
 			return err
 		}
