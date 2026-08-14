@@ -51,6 +51,9 @@ type Options struct {
 	Verbose        bool
 	Notify         NotifyLevel
 	Logger         func(level NotifyLevel, msg string)
+	Escalator      Escalator
+	Backoff        time.Duration
+	Sleep          func(time.Duration)
 }
 
 // NotifyLevel selects which watch lines are emitted.
@@ -328,7 +331,17 @@ func Loop(ctx context.Context, opts Options) error {
 			return werr
 		}
 		if err != nil {
-			return err
+			if opts.Once {
+				return err
+			}
+			tier := NextTier(h.Consecutive)
+			applyEscalation(ctx, opts, h.Consecutive)
+			if tier >= 4 {
+				h.Consecutive = 0
+				if werr := WriteHealth(opts.ProjectRoot, h); werr != nil {
+					return werr
+				}
+			}
 		}
 		if opts.Once {
 			return nil

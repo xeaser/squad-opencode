@@ -341,3 +341,103 @@ func TestLogFileAppends(t *testing.T) {
 		t.Fatalf("log file: %s", data)
 	}
 }
+
+type recordingEscalator struct {
+	calls []string
+}
+
+func (r *recordingEscalator) Reset(context.Context) error {
+	r.calls = append(r.calls, "reset")
+	return nil
+}
+
+func (r *recordingEscalator) ReprobeAuth(context.Context) error {
+	r.calls = append(r.calls, "auth")
+	return nil
+}
+
+func (r *recordingEscalator) GitPull(context.Context) error {
+	r.calls = append(r.calls, "pull")
+	return nil
+}
+
+type failLister struct {
+	n      int
+	cancel context.CancelFunc
+}
+
+func (f *failLister) List(context.Context) ([]Issue, error) {
+	f.n++
+	if f.n >= 4 && f.cancel != nil {
+		f.cancel()
+	}
+	return nil, errors.New("list fail")
+}
+
+func TestNextTier(t *testing.T) {
+	if NextTier(1) != 1 || NextTier(2) != 2 || NextTier(3) != 3 || NextTier(4) != 4 {
+		t.Fatal("1..4")
+	}
+	if NextTier(0) != 1 || NextTier(9) != 4 {
+		t.Fatal("clamp")
+	}
+}
+
+func TestLoopEscalationTiers(t *testing.T) {
+	root := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	esc := &recordingEscalator{}
+	lister := &failLister{cancel: cancel}
+	var backs []time.Duration
+	err := Loop(ctx, Options{
+		ProjectRoot: root,
+		Once:        false,
+		Interval:    time.Millisecond,
+		Backoff:     15 * time.Millisecond,
+		Lister:      lister,
+		Escalator:   esc,
+		Sleep: func(d time.Duration) {
+			backs = append(backs, d)
+		},
+	})
+	if err != nil && !errors.Is(err, context.Canceled) {
+		t.Fatal(err)
+	}
+	want := []string{"reset", "auth", "pull"}
+	if strings.Join(esc.calls, ",") != strings.Join(want, ",") {
+		t.Fatalf("calls %v want %v", esc.calls, want)
+	}
+	found := false
+	for _, d := range backs {
+		if d == 15*time.Millisecond {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("want long backoff, got %v", backs)
+	}
+}
+
+func TestLoopOnceDoesNotEscalate(t *testing.T) {
+	root := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	esc := &recordingEscalator{}
+	err := Loop(context.Background(), Options{
+		ProjectRoot: root,
+		Once:        true,
+		Lister:      StaticLister{Err: errors.New("list fail")},
+		Escalator:   esc,
+	})
+	if err == nil {
+		t.Fatal("want pass error")
+	}
+	if len(esc.calls) != 0 {
+		t.Fatalf("escalated on --once: %v", esc.calls)
+	}
+}
