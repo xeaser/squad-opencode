@@ -37,7 +37,7 @@ func Execute(args []string) int {
 		return 0
 	case "init":
 		return cmdInit(rest)
-	case "doctor":
+	case "doctor", "heartbeat":
 		return cmdDoctor()
 	case "status":
 		return cmdStatus()
@@ -49,7 +49,7 @@ func Execute(args []string) int {
 		return cmdUpgrade(rest)
 	case "run":
 		return cmdRun(rest)
-	case "watch":
+	case "watch", "triage", "loop":
 		return cmdWatch(rest)
 	case "export":
 		return cmdExport(rest)
@@ -89,13 +89,13 @@ Usage:
 Commands:
   init [--preset default] [--description <text>]
   upgrade [--dry-run] [--force]
-  doctor
+  doctor | heartbeat
   status | cast
   cast --add <name> [--role <role>]
   cast --remove <name>
   recast
   run -p <prompt> | --file <path> [--agent name] [--url]
-  watch [--execute] [--interval minutes] [--once] [--url]
+  watch | triage | loop [--execute] [--interval minutes] [--once] [--url]
       [--overnight-start HH:MM] [--overnight-end HH:MM]
   export [file]
   import <file> [--with-host]
