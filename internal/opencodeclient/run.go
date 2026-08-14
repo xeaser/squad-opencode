@@ -3,9 +3,12 @@ package opencodeclient
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/sst/opencode-sdk-go"
+	"github.com/xeaser/squad-opencode/internal/traces"
 )
 
 // RunRequest is a non-interactive prompt.
@@ -34,6 +37,13 @@ type SDKRunner struct {
 
 // Run implements Runner.
 func (r SDKRunner) Run(ctx context.Context, req RunRequest) (RunResult, error) {
+	start := time.Now()
+	res, err := r.run(ctx, req)
+	recordRun(req, start, err)
+	return res, err
+}
+
+func (r SDKRunner) run(ctx context.Context, req RunRequest) (RunResult, error) {
 	if req.Agent == "" {
 		req.Agent = "squad"
 	}
@@ -83,6 +93,30 @@ func (r SDKRunner) Run(ctx context.Context, req RunRequest) (RunResult, error) {
 		}
 	}
 	return RunResult{SessionID: sess.ID, Text: b.String()}, nil
+}
+
+func recordRun(req RunRequest, start time.Time, runErr error) {
+	if req.Directory == "" {
+		return
+	}
+	agent := req.Agent
+	if agent == "" {
+		agent = "squad"
+	}
+	status := "OK"
+	if runErr != nil {
+		status = "ERROR"
+	}
+	_ = traces.Append(req.Directory, traces.Span{
+		Name:   "squad-oc.run",
+		Start:  start,
+		End:    time.Now(),
+		Status: status,
+		Attributes: map[string]string{
+			"agent":        agent,
+			"prompt_bytes": strconv.Itoa(len(req.Prompt)),
+		},
+	})
 }
 
 // FakeRunner records calls for tests.

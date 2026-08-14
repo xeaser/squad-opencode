@@ -1,10 +1,16 @@
 package cli
 
 import (
+	"bytes"
+	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/xeaser/squad-opencode/internal/traces"
 )
 
 func TestHelpAndUnknown(t *testing.T) {
@@ -109,6 +115,111 @@ func TestRunRequiresPrompt(t *testing.T) {
 	if Execute([]string{"run"}) != 2 {
 		t.Fatal()
 	}
+}
+
+func TestTracesCLI(t *testing.T) {
+	root := t.TempDir()
+	prev, _ := os.Getwd()
+	if err := os.Chdir(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(prev) })
+
+	if Execute([]string{"traces", "--nope"}) != 2 {
+		t.Fatal("unknown flag")
+	}
+	if Execute([]string{"traces", "--last", "x"}) != 2 {
+		t.Fatal("bad last")
+	}
+	if Execute([]string{"traces", "--export"}) != 2 {
+		t.Fatal("export requires file")
+	}
+
+	start := time.Date(2026, 8, 14, 12, 0, 0, 0, time.UTC)
+	if err := traces.Append(root, traces.Span{
+		Name:    "squad-oc.run",
+		TraceID: "aa",
+		SpanID:  "bb",
+		Start:   start,
+		End:     start.Add(time.Second),
+		Status:  "OK",
+		Attributes: map[string]string{
+			"agent":        "squad",
+			"prompt_bytes": "3",
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := traces.Append(root, traces.Span{
+		Name:       "squad-oc.watch.execute",
+		TraceID:    "cc",
+		SpanID:     "dd",
+		Start:      start.Add(time.Minute),
+		End:        start.Add(time.Minute + 2*time.Second),
+		Status:     "ERROR",
+		Attributes: map[string]string{"issues": "2"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	table := captureStdout(t, func() {
+		if Execute([]string{"traces"}) != 0 {
+			t.Fatal("traces")
+		}
+	})
+	if !strings.Contains(table, "squad-oc.run") || !strings.Contains(table, "squad-oc.watch.execute") {
+		t.Fatalf("table: %s", table)
+	}
+
+	one := captureStdout(t, func() {
+		if Execute([]string{"traces", "--last", "1", "--json"}) != 0 {
+			t.Fatal("json")
+		}
+	})
+	var listed []traces.Span
+	if err := json.Unmarshal([]byte(one), &listed); err != nil {
+		t.Fatal(err)
+	}
+	if len(listed) != 1 || listed[0].Name != "squad-oc.watch.execute" {
+		t.Fatalf("json last 1: %s", one)
+	}
+
+	dest := filepath.Join(root, "out.otlp.json")
+	exported := captureStdout(t, func() {
+		if Execute([]string{"traces", "--export", dest}) != 0 {
+			t.Fatal("export")
+		}
+	})
+	if !strings.Contains(exported, dest) {
+		t.Fatalf("export msg: %s", exported)
+	}
+	body, err := os.ReadFile(dest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), `"resourceSpans"`) || !strings.Contains(string(body), "squad-oc.watch.execute") {
+		t.Fatalf("otlp: %s", body)
+	}
+}
+
+func captureStdout(t *testing.T, fn func()) string {
+	t.Helper()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := os.Stdout
+	os.Stdout = w
+	done := make(chan string)
+	go func() {
+		var buf bytes.Buffer
+		_, _ = io.Copy(&buf, r)
+		done <- buf.String()
+	}()
+	fn()
+	_ = w.Close()
+	os.Stdout = old
+	return <-done
 }
 
 func isolateHome(t *testing.T) string {

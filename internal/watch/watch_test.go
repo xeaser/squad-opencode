@@ -12,6 +12,7 @@ import (
 
 	"github.com/xeaser/squad-opencode/internal/opencodeclient"
 	"github.com/xeaser/squad-opencode/internal/squad"
+	"github.com/xeaser/squad-opencode/internal/traces"
 )
 
 func TestBuildContextAndPass(t *testing.T) {
@@ -59,6 +60,68 @@ func TestBuildContextAndPass(t *testing.T) {
 	})
 	if err != nil || !strings.Contains(triage, "#7") {
 		t.Fatalf("%v %s", err, triage)
+	}
+
+	spans, err := traces.List(root, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(spans) != 1 {
+		t.Fatalf("execute should record one span, got %+v", spans)
+	}
+	if spans[0].Name != "squad-oc.watch.execute" || spans[0].Status != "OK" {
+		t.Fatalf("%+v", spans[0])
+	}
+	if spans[0].Attributes["issues"] != "1" {
+		t.Fatalf("issues attr: %+v", spans[0].Attributes)
+	}
+}
+
+func TestPassNoExecuteDoesNotRecordSpan(t *testing.T) {
+	root := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	_, _, err := Pass(context.Background(), Options{
+		ProjectRoot: root,
+		Execute:     false,
+		Lister:      StaticLister{Issues: []Issue{{Number: 1, Title: "x", State: "OPEN"}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	spans, err := traces.List(root, 10)
+	if err != nil || len(spans) != 0 {
+		t.Fatalf("triage should not record: %+v %v", spans, err)
+	}
+}
+
+func TestPassExecuteRecordsErrorSpan(t *testing.T) {
+	root := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	_, _, err := Pass(context.Background(), Options{
+		ProjectRoot: root,
+		Execute:     true,
+		Lister: StaticLister{Issues: []Issue{
+			{Number: 1, Title: "x", State: "OPEN"},
+			{Number: 2, Title: "y", State: "OPEN"},
+		}},
+		Runner: &opencodeclient.FakeRunner{Err: errors.New("boom")},
+	})
+	if err == nil {
+		t.Fatal("want execute error")
+	}
+	spans, err := traces.List(root, 10)
+	if err != nil || len(spans) != 1 {
+		t.Fatalf("%+v %v", spans, err)
+	}
+	if spans[0].Name != "squad-oc.watch.execute" || spans[0].Status != "ERROR" {
+		t.Fatalf("%+v", spans[0])
+	}
+	if spans[0].Attributes["issues"] != "2" {
+		t.Fatalf("issues attr: %+v", spans[0].Attributes)
 	}
 }
 

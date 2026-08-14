@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/xeaser/squad-opencode/internal/opencodeclient"
 	"github.com/xeaser/squad-opencode/internal/squad"
+	"github.com/xeaser/squad-opencode/internal/traces"
 )
 
 // Issue is a work item (usually a GitHub issue).
@@ -285,12 +287,28 @@ func Pass(ctx context.Context, opts Options) (executed bool, summary string, err
 		return false, "", err
 	}
 	notify(opts, NotifyImportant, "execute started")
+	start := time.Now()
 	res, err := opts.Runner.Run(ctx, opencodeclient.RunRequest{
 		Directory: opts.ProjectRoot,
 		Agent:     "squad",
 		Prompt:    ctxText,
 		Title:     "squad-oc watch",
 	})
+	status := "OK"
+	if err != nil {
+		status = "ERROR"
+	}
+	if opts.ProjectRoot != "" {
+		_ = traces.Append(opts.ProjectRoot, traces.Span{
+			Name:   "squad-oc.watch.execute",
+			Start:  start,
+			End:    time.Now(),
+			Status: status,
+			Attributes: map[string]string{
+				"issues": strconv.Itoa(len(issues)),
+			},
+		})
+	}
 	if err != nil {
 		notify(opts, NotifyImportant, "execute error: "+err.Error())
 		return false, summary, err
