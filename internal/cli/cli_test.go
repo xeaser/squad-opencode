@@ -51,6 +51,20 @@ func TestInitExportImportViaCLI(t *testing.T) {
 	if err != nil || !strings.Contains(string(b), "cli") {
 		t.Fatalf("%v %s", err, b)
 	}
+	if _, err := os.Stat(filepath.Join(other, ".opencode", "agents", "lead.md")); !os.IsNotExist(err) {
+		t.Fatal("default import should not write host files")
+	}
+
+	withHost := t.TempDir()
+	if err := os.Chdir(withHost); err != nil {
+		t.Fatal(err)
+	}
+	if code := Execute([]string{"import", "--with-host", snap}); code != 0 {
+		t.Fatal("import --with-host")
+	}
+	if _, err := os.Stat(filepath.Join(withHost, ".opencode", "agents", "lead.md")); err != nil {
+		t.Fatal("import --with-host should write .opencode/agents/lead.md")
+	}
 }
 
 func TestRunRequiresPrompt(t *testing.T) {
