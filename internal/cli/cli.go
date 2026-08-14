@@ -96,7 +96,7 @@ Commands:
   watch [--execute] [--interval minutes] [--once] [--url]
       [--overnight-start HH:MM] [--overnight-end HH:MM]
   export [file]
-  import <file>
+  import <file> [--with-host]
   externalize [--key name]
   internalize
   nap [--dry-run] [--deep]
@@ -497,7 +497,27 @@ func cmdExport(args []string) int {
 }
 
 func cmdImport(args []string) int {
-	if len(args) < 1 {
+	withHost := false
+	src := ""
+	for _, a := range args {
+		switch {
+		case a == "--with-host":
+			withHost = true
+		case a == "--help" || a == "-h":
+			printHelp()
+			return 0
+		case strings.HasPrefix(a, "-"):
+			fmt.Fprintf(os.Stderr, "Unknown import flag: %s\n", a)
+			return 2
+		default:
+			if src != "" {
+				fmt.Fprintln(os.Stderr, "import accepts one file")
+				return 2
+			}
+			src = a
+		}
+	}
+	if src == "" {
 		fmt.Fprintln(os.Stderr, "import requires a file")
 		return 2
 	}
@@ -505,11 +525,11 @@ func cmdImport(args []string) int {
 	if code != 0 {
 		return code
 	}
-	if err := squad.Import(root, args[0]); err != nil {
+	if err := squad.Import(root, src, withHost); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
-	fmt.Println("imported", args[0])
+	fmt.Println("imported", src)
 	return 0
 }
 
