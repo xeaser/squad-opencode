@@ -38,8 +38,12 @@ func Execute(args []string) int {
 		return cmdInit(rest)
 	case "doctor":
 		return cmdDoctor()
-	case "status", "cast":
+	case "status":
 		return cmdStatus()
+	case "cast":
+		return cmdCast(rest)
+	case "recast":
+		return cmdRecast()
 	case "upgrade":
 		return cmdUpgrade(rest)
 	case "run":
@@ -86,6 +90,8 @@ Commands:
   upgrade [--dry-run] [--force]
   doctor
   status | cast
+  cast --add <name> [--role <role>]
+  recast
   run -p <prompt> | --file <path> [--agent name]   # needs: opencode serve
   watch [--execute] [--interval minutes] [--once]
   export [file]
@@ -229,6 +235,62 @@ func cmdStatus() int {
 	fmt.Printf("%-*s  Role\n%s  ----\n", width, "Name", strings.Repeat("-", width))
 	for _, m := range members {
 		fmt.Printf("%-*s  %s  [%s]\n", width, m.Name, m.Role, m.Status)
+	}
+	return 0
+}
+
+func cmdCast(args []string) int {
+	var add, role string
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		switch {
+		case a == "--add" && i+1 < len(args):
+			i++
+			add = args[i]
+		case a == "--role" && i+1 < len(args):
+			i++
+			role = args[i]
+		case a == "--help" || a == "-h":
+			printHelp()
+			return 0
+		default:
+			fmt.Fprintf(os.Stderr, "Unknown cast flag: %s\n", a)
+			return 2
+		}
+	}
+	if add == "" {
+		return cmdStatus()
+	}
+	root, code := cwd()
+	if code != 0 {
+		return code
+	}
+	if err := squad.AddMember(root, add, role); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	res, err := squad.Recast(root)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("added %s; recast %d agent file(s)\n", add, res.Written)
+	return 0
+}
+
+func cmdRecast() int {
+	root, code := cwd()
+	if code != 0 {
+		return code
+	}
+	res, err := squad.Recast(root)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("recast %d agent file(s)\n", res.Written)
+	for _, id := range res.IDs {
+		fmt.Printf("  ~ .opencode/agents/%s.md\n", id)
 	}
 	return 0
 }
