@@ -187,7 +187,7 @@ go test ./...
 go build -o squad-oc ./cmd/squad-oc
 ```
 
-Requires **Go 1.22+**.
+Requires **Go 1.22+**. How to send a change: **[CONTRIBUTING.md](CONTRIBUTING.md)**.
 
 ## License
 
