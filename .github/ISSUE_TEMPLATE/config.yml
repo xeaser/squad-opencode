@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Usage question
+    url: https://github.com/xeaser/squad-opencode/blob/master/docs/get-started.md
+    about: How to init, run, and watch — start with the get-started guide.

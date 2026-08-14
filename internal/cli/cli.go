@@ -3,6 +3,8 @@ package cli
 import (
 	"bufio"
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,8 +15,10 @@ import (
 	"github.com/xeaser/squad-opencode/internal/doctor"
 	"github.com/xeaser/squad-opencode/internal/githubissues"
 	"github.com/xeaser/squad-opencode/internal/opencodeclient"
+	"github.com/xeaser/squad-opencode/internal/selfupdate"
 	"github.com/xeaser/squad-opencode/internal/share"
 	"github.com/xeaser/squad-opencode/internal/squad"
+	"github.com/xeaser/squad-opencode/internal/traces"
 	"github.com/xeaser/squad-opencode/internal/updatecheck"
 	"github.com/xeaser/squad-opencode/internal/version"
 	"github.com/xeaser/squad-opencode/internal/watch"
@@ -36,7 +40,7 @@ func Execute(args []string) int {
 		return 0
 	case "init":
 		return cmdInit(rest)
-	case "doctor":
+	case "doctor", "heartbeat":
 		return cmdDoctor()
 	case "status":
 		return cmdStatus()
@@ -48,7 +52,7 @@ func Execute(args []string) int {
 		return cmdUpgrade(rest)
 	case "run":
 		return cmdRun(rest)
-	case "watch":
+	case "watch", "triage", "loop":
 		return cmdWatch(rest)
 	case "export":
 		return cmdExport(rest)
@@ -69,7 +73,9 @@ func Execute(args []string) int {
 	case "link":
 		return cmdLink(rest)
 	case "update-check":
-		return cmdUpdateCheck()
+		return cmdUpdateCheck(rest)
+	case "traces":
+		return cmdTraces(rest)
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown command: %s\n\n", cmd)
 		printHelp()
@@ -86,17 +92,20 @@ Usage:
   squad-oc <command> [options]
 
 Commands:
-  init [--preset default] [--description <text>]
-  upgrade [--dry-run] [--force]
-  doctor
+  init [--preset default] [--description <text>] [--global]
+  upgrade [--dry-run] [--force] [--global] [--self]
+  doctor | heartbeat
   status | cast
   cast --add <name> [--role <role>]
+  cast --remove <name>
   recast
   run -p <prompt> | --file <path> [--agent name] [--url]
-  watch [--execute] [--interval minutes] [--once] [--url]
-      [--overnight-start HH:MM] [--overnight-end HH:MM]
+  watch | triage | loop [--execute] [--interval minutes] [--once] [--health] [--url]
+      [--overnight-start HH:MM] [--overnight-end HH:MM] [--label name]
+      [--log-file path] [--verbose] [--notify-level all|important|none]
+      [--state-backend memory|git-notes|orphan-branch]
   export [file]
-  import <file>
+  import <file> [--with-host]
   externalize [--key name]
   internalize
   nap [--dry-run] [--deep]
@@ -106,7 +115,8 @@ Commands:
   pack <path|git-url>
   link <team-dir>
   link --off
-  update-check
+  update-check [--json] [--refresh]
+  traces [--last N] [--json] [--export file]
   help | version
 
 Team state (.squad/) is never wiped by upgrade.
@@ -126,6 +136,7 @@ func cmdInit(args []string) int {
 	preset := "default"
 	var description string
 	interactive := true
+	global := false
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch {
@@ -141,6 +152,8 @@ func cmdInit(args []string) int {
 			i++
 			description = args[i]
 			interactive = false
+		case a == "--global":
+			global = true
 		case a == "--help" || a == "-h":
 			printHelp()
 			return 0
@@ -164,7 +177,7 @@ func cmdInit(args []string) int {
 		description = strings.TrimSpace(line)
 	}
 	result, err := squad.WriteDefaultPreset(squad.InitOptions{
-		ProjectRoot: root, Preset: preset, ProjectDescription: description,
+		ProjectRoot: root, Preset: preset, ProjectDescription: description, Global: global,
 	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -172,6 +185,9 @@ func cmdInit(args []string) int {
 	}
 	fmt.Println(result.Message)
 	if result.AlreadyInitialized {
+		if global {
+			fmt.Println(result.ProjectRoot)
+		}
 		return 0
 	}
 	fmt.Printf("Project: %s\nFiles written: %d\n", result.ProjectRoot, len(result.FilesWritten))
@@ -203,51 +219,26 @@ func cmdStatus() int {
 		fmt.Fprintln(os.Stderr, "Not initialized. Run: squad-oc init --preset default")
 		return 1
 	}
-	det := squad.Detect(root)
-	members, err := squad.ReadTeam(root)
+	out, err := squad.StatusReport(root)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
-	fmt.Printf("Squad status — %s\n", root)
-	if det.Config != nil {
-		fmt.Printf("Host: %s  Preset: %s\n", det.Config.Host, det.Config.Preset)
-		if det.Config.ProjectDescription != "" {
-			fmt.Printf("Project: %s\n", det.Config.ProjectDescription)
-		}
-		if det.Config.ExternalPath != "" {
-			fmt.Printf("External: %s\n", det.Config.ExternalPath)
-		}
-		if det.Config.LinkPath != "" {
-			fmt.Printf("Link: %s\n", det.Config.LinkPath)
-		}
-	}
-	fmt.Println()
-	if len(members) == 0 {
-		fmt.Println("(no members parsed from team.md)")
-		return 0
-	}
-	width := 4
-	for _, m := range members {
-		if len(m.Name) > width {
-			width = len(m.Name)
-		}
-	}
-	fmt.Printf("%-*s  Role\n%s  ----\n", width, "Name", strings.Repeat("-", width))
-	for _, m := range members {
-		fmt.Printf("%-*s  %s  [%s]\n", width, m.Name, m.Role, m.Status)
-	}
+	fmt.Print(out)
 	return 0
 }
 
 func cmdCast(args []string) int {
-	var add, role string
+	var add, role, remove string
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch {
 		case a == "--add" && i+1 < len(args):
 			i++
 			add = args[i]
+		case a == "--remove" && i+1 < len(args):
+			i++
+			remove = args[i]
 		case a == "--role" && i+1 < len(args):
 			i++
 			role = args[i]
@@ -259,12 +250,29 @@ func cmdCast(args []string) int {
 			return 2
 		}
 	}
-	if add == "" {
+	if add != "" && remove != "" {
+		fmt.Fprintln(os.Stderr, "cast: use --add or --remove, not both")
+		return 2
+	}
+	if add == "" && remove == "" {
 		return cmdStatus()
 	}
 	root, code := cwd()
 	if code != 0 {
 		return code
+	}
+	if remove != "" {
+		if err := squad.RemoveMember(root, remove); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		res, err := squad.Recast(root)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		fmt.Printf("removed %s; recast %d agent file(s)\n", remove, res.Written)
+		return 0
 	}
 	if err := squad.AddMember(root, add, role); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -297,16 +305,25 @@ func cmdRecast() int {
 }
 
 func cmdUpgrade(args []string) int {
-	dry, force := false, false
+	dry, force, global := false, false, false
 	for _, a := range args {
 		switch a {
 		case "--dry-run":
 			dry = true
 		case "--force":
 			force = true
+		case "--global":
+			global = true
 		case "--self":
-			fmt.Println("upgrade --self is not wired yet. Build from source:")
-			fmt.Println("  go install github.com/xeaser/squad-opencode/cmd/squad-oc@latest")
+			msg, err := selfupdate.UpgradeSelf(nil, version.Repo, version.Version)
+			if err != nil && !errors.Is(err, selfupdate.ErrReplacedOnNextStart) {
+				fmt.Fprintln(os.Stderr, err)
+				return 1
+			}
+			fmt.Println(msg)
+			if errors.Is(err, selfupdate.ErrReplacedOnNextStart) {
+				fmt.Println("replaced on next start")
+			}
 			return 0
 		case "--help", "-h":
 			printHelp()
@@ -320,8 +337,20 @@ func cmdUpgrade(args []string) int {
 	if code != 0 {
 		return code
 	}
+	if global {
+		g, err := squad.GlobalSquadDir()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		root = g
+	}
 	res, err := squad.UpgradeHostFiles(squad.UpgradeOptions{ProjectRoot: root, DryRun: dry, Force: force})
 	if err != nil {
+		if global && !squad.IsInitialized(root) {
+			fmt.Fprintln(os.Stderr, "not initialized — run: squad-oc init --global")
+			return 1
+		}
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
@@ -394,8 +423,12 @@ func cmdRun(args []string) int {
 func cmdWatch(args []string) int {
 	exec := false
 	once := false
+	health := false
 	interval := 10
-	var overnightStart, overnightEnd, apiURL string
+	verbose := false
+	notifyLevel := watch.NotifyImportant
+	var overnightStart, overnightEnd, apiURL, logFile, stateBackend string
+	var labels []string
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch {
@@ -403,6 +436,10 @@ func cmdWatch(args []string) int {
 			exec = true
 		case a == "--once":
 			once = true
+		case a == "--health":
+			health = true
+		case a == "--verbose":
+			verbose = true
 		case a == "--interval" && i+1 < len(args):
 			i++
 			n, err := strconv.Atoi(args[i])
@@ -420,6 +457,23 @@ func cmdWatch(args []string) int {
 		case a == "--url" && i+1 < len(args):
 			i++
 			apiURL = args[i]
+		case a == "--label" && i+1 < len(args):
+			i++
+			labels = append(labels, args[i])
+		case a == "--log-file" && i+1 < len(args):
+			i++
+			logFile = args[i]
+		case a == "--notify-level" && i+1 < len(args):
+			i++
+			lvl, err := watch.ParseNotifyLevel(args[i])
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				return 2
+			}
+			notifyLevel = lvl
+		case a == "--state-backend" && i+1 < len(args):
+			i++
+			stateBackend = args[i]
 		default:
 			fmt.Fprintf(os.Stderr, "Unknown watch flag: %s\n", a)
 			return 2
@@ -429,6 +483,14 @@ func cmdWatch(args []string) int {
 	if code != 0 {
 		return code
 	}
+	backend, err := watch.ParseStateBackend(stateBackend, root)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 2
+	}
+	if health {
+		return cmdWatchHealth(root, backend)
+	}
 	opts := watch.Options{
 		ProjectRoot:    root,
 		Execute:        exec,
@@ -436,7 +498,15 @@ func cmdWatch(args []string) int {
 		Interval:       time.Duration(interval) * time.Minute,
 		OvernightStart: overnightStart,
 		OvernightEnd:   overnightEnd,
-		Lister:         githubissues.GHLister{Dir: root},
+		Labels:         labels,
+		LogFile:        logFile,
+		Verbose:        verbose,
+		Notify:         notifyLevel,
+		Logger: func(_ watch.NotifyLevel, msg string) {
+			fmt.Println(msg)
+		},
+		Backend: backend,
+		Lister:  githubissues.GHLister{Dir: root, Labels: labels},
 	}
 	if exec {
 		ensured, code := ensureAPI(apiURL, root)
@@ -456,6 +526,34 @@ func cmdWatch(args []string) int {
 	}
 	fmt.Printf("watch loop every %d min (stop: touch .squad/ralph-stop)\n", interval)
 	return watchLoop(opts)
+}
+
+func cmdWatchHealth(root string, backend watch.StateBackend) int {
+	var h watch.Health
+	var err error
+	if backend != nil {
+		h, err = backend.Load(context.Background())
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		if h.PID == 0 && h.Round == 0 && h.StartedAt.IsZero() {
+			fmt.Println("no watch status (start: squad-oc watch)")
+			return 1
+		}
+	} else {
+		h, err = watch.ReadHealth(root)
+		if err != nil {
+			if os.IsNotExist(err) {
+				fmt.Println("no watch status (start: squad-oc watch)")
+				return 1
+			}
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+	}
+	fmt.Print(watch.FormatHealth(h, time.Now()))
+	return 0
 }
 
 func ensureAPI(apiURL, root string) (opencodeclient.EnsureResult, int) {
@@ -497,7 +595,27 @@ func cmdExport(args []string) int {
 }
 
 func cmdImport(args []string) int {
-	if len(args) < 1 {
+	withHost := false
+	src := ""
+	for _, a := range args {
+		switch {
+		case a == "--with-host":
+			withHost = true
+		case a == "--help" || a == "-h":
+			printHelp()
+			return 0
+		case strings.HasPrefix(a, "-"):
+			fmt.Fprintf(os.Stderr, "Unknown import flag: %s\n", a)
+			return 2
+		default:
+			if src != "" {
+				fmt.Fprintln(os.Stderr, "import accepts one file")
+				return 2
+			}
+			src = a
+		}
+	}
+	if src == "" {
 		fmt.Fprintln(os.Stderr, "import requires a file")
 		return 2
 	}
@@ -505,11 +623,11 @@ func cmdImport(args []string) int {
 	if code != 0 {
 		return code
 	}
-	if err := squad.Import(root, args[0]); err != nil {
+	if err := squad.Import(root, src, withHost); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
-	fmt.Println("imported", args[0])
+	fmt.Println("imported", src)
 	return 0
 }
 
@@ -696,12 +814,103 @@ func cmdLink(args []string) int {
 	return 0
 }
 
-func cmdUpdateCheck() int {
-	res, err := updatecheck.Check(nil)
+func cmdUpdateCheck(args []string) int {
+	var asJSON, refresh bool
+	for _, a := range args {
+		switch a {
+		case "--json":
+			asJSON = true
+		case "--refresh":
+			refresh = true
+		case "--help", "-h":
+			printHelp()
+			return 0
+		default:
+			fmt.Fprintf(os.Stderr, "Unknown update-check flag: %s\n", a)
+			return 2
+		}
+	}
+	res, err := updatecheck.Check(nil, refresh)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
+	if asJSON {
+		enc := json.NewEncoder(os.Stdout)
+		if err := enc.Encode(res); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		return 0
+	}
 	fmt.Println(res.Message)
+	return 0
+}
+
+func cmdTraces(args []string) int {
+	last := 20
+	asJSON := false
+	exportPath := ""
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		switch {
+		case a == "--json":
+			asJSON = true
+		case a == "--last" && i+1 < len(args):
+			i++
+			n, err := strconv.Atoi(args[i])
+			if err != nil || n < 0 {
+				fmt.Fprintln(os.Stderr, "invalid --last")
+				return 2
+			}
+			last = n
+		case a == "--export" && i+1 < len(args):
+			i++
+			exportPath = args[i]
+		case a == "--export":
+			fmt.Fprintln(os.Stderr, "traces --export requires a file")
+			return 2
+		case a == "--last":
+			fmt.Fprintln(os.Stderr, "traces --last requires N")
+			return 2
+		case a == "--help" || a == "-h":
+			printHelp()
+			return 0
+		default:
+			fmt.Fprintf(os.Stderr, "Unknown traces flag: %s\n", a)
+			return 2
+		}
+	}
+	root, code := cwd()
+	if code != 0 {
+		return code
+	}
+	spans, err := traces.List(root, last)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if exportPath != "" {
+		if !filepath.IsAbs(exportPath) {
+			exportPath = filepath.Join(root, exportPath)
+		}
+		if err := traces.ExportOTLPFile(spans, exportPath); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		fmt.Println("exported", exportPath)
+		if !asJSON {
+			return 0
+		}
+	}
+	if asJSON {
+		enc := json.NewEncoder(os.Stdout)
+		if err := enc.Encode(spans); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		return 0
+	}
+	fmt.Print(traces.FormatTable(spans))
 	return 0
 }

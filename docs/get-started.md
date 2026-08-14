@@ -116,13 +116,12 @@ squad-oc init --preset default --description "Recipe sharing app with React and 
 
 Re-running `init` is safe (no overwrite once `.squad/config.json` exists).
 
-Other commands (see `squad-oc help` and the README examples): `run -p` against a live OpenCode server, `watch --once` / overnight windows, `export`/`import`, `nap`, `scrub-emails`, `upstream` / `pack`, `link`, `cast --add` / `recast`.
-
 To refresh OpenCode agents/skills after a `squad-oc` update (team files stay put):
 
 ```bash
 squad-oc upgrade --dry-run
 squad-oc upgrade
+squad-oc upgrade --self
 ```
 
 Validate:
@@ -143,6 +142,35 @@ squad-oc run --url http://127.0.0.1:5000 -p "Summarize .squad/team.md"
 ```
 
 Plain `opencode` opens the interactive UI and does **not** listen on 4096.
+
+### Live check
+
+From this repo root, ground `doctor` / `run` against a dummy project (never this git tree):
+
+```powershell
+pwsh -File scripts/live-e2e.ps1
+```
+
+The script builds `squad-oc.exe`, inits `D:\xAI\squad-oc-dummy` if needed, starts `opencode serve --hostname 127.0.0.1 --port 4096` there (or attaches if that localhost port is already up), then runs `doctor` and `run -p "Reply with exactly PONG and nothing else."`. It fails if `:4096` is bound on a non-localhost address. The TUI is optional; if no window is open, skip it.
+
+`TestLiveEnsureAPI` stays behind `SQUAD_OC_LIVE=1`. CI stays unit-only (`go test ./...` without that env).
+
+---
+
+## Also useful
+
+- `squad-oc init --global` (and `upgrade --global`) for a personal team outside the repo
+- `squad-oc cast --add Designer --role Design` then OpenCode sees `@designer` after recast
+- `squad-oc cast --remove Tester` drops a member and recasts agents
+- `squad-oc import snapshot.json --with-host` restores `.squad/` plus host agents
+- `squad-oc link ~/teams/platform` to share one `.squad/` across repos (`link --off` to detach)
+- `squad-oc watch --health` prints the last Ralph snapshot
+- `squad-oc watch --execute --overnight-start 18:00 --overnight-end 08:00`
+- `squad-oc traces` lists local run/watch spans (`--export` writes OTLP JSON)
+- `squad-oc run -p "…"` starts `opencode serve` on `127.0.0.1:4096` if nothing is there; a custom `--url` never auto-starts
+- `squad-oc pack <path|git-url>` or `squad-oc upstream add <name> <path|git-url>` to pull extra agents/skills (see README)
+
+`export`/`import`, `nap`, `scrub-emails`, and the rest are in `squad-oc help` and the README.
 
 ---
 

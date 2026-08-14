@@ -127,3 +127,85 @@ func TestReadTeamAfterInit(t *testing.T) {
 	}
 }
 
+func isolateHome(t *testing.T) string {
+	t.Helper()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	return home
+}
+
+func TestWriteDefaultPresetGlobal(t *testing.T) {
+	home := isolateHome(t)
+	res, err := WriteDefaultPreset(InitOptions{
+		Global:             true,
+		ProjectDescription: "Personal notes",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantRoot := filepath.Join(home, ".squad-oc", "global")
+	if res.ProjectRoot != wantRoot {
+		t.Fatalf("root %s want %s", res.ProjectRoot, wantRoot)
+	}
+	team := filepath.Join(home, ".squad-oc", "global", ".squad", "team.md")
+	data, err := os.ReadFile(team)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "Personal notes") {
+		t.Errorf("team.md missing description: %s", data)
+	}
+	if !IsInitialized(wantRoot) {
+		t.Error("expected initialized")
+	}
+}
+
+func TestUpgradeHostFilesGlobal(t *testing.T) {
+	home := isolateHome(t)
+	res, err := WriteDefaultPreset(InitOptions{Global: true, ProjectDescription: "Keep me"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := res.ProjectRoot
+	if root != filepath.Join(home, ".squad-oc", "global") {
+		t.Fatalf("root %s", root)
+	}
+
+	teamPath := filepath.Join(root, ".squad", "team.md")
+	teamBefore, err := os.ReadFile(teamPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	agent := filepath.Join(root, ".opencode", "agents", "squad.md")
+	if err := os.WriteFile(agent, []byte("MUTATED\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	up, err := UpgradeHostFiles(UpgradeOptions{ProjectRoot: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(up.Updated) == 0 {
+		t.Fatalf("expected squad.md updated, got %+v", up)
+	}
+
+	got, err := os.ReadFile(agent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) == "MUTATED\n" || !strings.Contains(string(got), "You are **Squad**") {
+		t.Fatalf("agent not restored from template:\n%s", got)
+	}
+
+	teamAfter, err := os.ReadFile(teamPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(teamAfter) != string(teamBefore) {
+		t.Fatal("team.md must not change on upgrade")
+	}
+	if !strings.Contains(string(teamAfter), "Keep me") {
+		t.Fatal("description lost")
+	}
+}

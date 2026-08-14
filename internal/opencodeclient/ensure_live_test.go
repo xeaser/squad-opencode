@@ -17,9 +17,10 @@ func TestLiveEnsureAPI(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
 	defer cancel()
-	// Serve outlives the test; do not use t.TempDir() (Windows cannot delete cwd).
-	dir, err := os.MkdirTemp("", "squad-oc-live-*")
-	if err != nil {
+	// Serve may outlive the test; use the dummy sandbox, not t.TempDir()
+	// (Windows cannot delete a cwd that still holds opencode serve).
+	dir := `D:\xAI\squad-oc-dummy`
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	res, err := EnsureAPI(ctx, "", dir)

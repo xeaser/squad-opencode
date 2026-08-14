@@ -2,5 +2,6 @@
 comms/*
 !comms/.gitkeep
 
-# Local-only runtime (if added later)
+# Local-only runtime
 *.tmp
+traces/

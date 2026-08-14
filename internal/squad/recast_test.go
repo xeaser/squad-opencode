@@ -79,3 +79,72 @@ func TestRecastUsesStockLeadTemplate(t *testing.T) {
 		t.Fatal(string(got))
 	}
 }
+
+func TestRemoveMemberDeletesHostAgent(t *testing.T) {
+	root := t.TempDir()
+	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	if err := RemoveMember(root, "Tester"); err != nil {
+		t.Fatal(err)
+	}
+	members, err := ReadTeam(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range members {
+		if m.ID == "tester" {
+			t.Fatal("still present")
+		}
+	}
+	if _, err := os.Stat(filepath.Join(root, ".opencode", "agents", "tester.md")); !os.IsNotExist(err) {
+		t.Fatal("host agent should be gone")
+	}
+	if _, err := os.Stat(filepath.Join(root, ".squad", "agents", "tester", "charter.md")); err != nil {
+		t.Fatal("charter should remain")
+	}
+	if _, err := os.Stat(filepath.Join(root, ".opencode", "agents", "squad.md")); err != nil {
+		t.Fatal("coordinator agent should remain")
+	}
+}
+
+func TestRemoveMemberMatchesIDAndName(t *testing.T) {
+	root := t.TempDir()
+	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	if err := RemoveMember(root, "frontend"); err != nil {
+		t.Fatal(err)
+	}
+	if err := RemoveMember(root, "BACKEND"); err != nil {
+		t.Fatal(err)
+	}
+	members, err := ReadTeam(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range members {
+		if m.ID == "frontend" || m.ID == "backend" {
+			t.Fatalf("still present: %+v", m)
+		}
+	}
+}
+
+func TestRemoveMemberRejectsMissingAndSquad(t *testing.T) {
+	root := t.TempDir()
+	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	if err := RemoveMember(root, "Nobody"); err == nil {
+		t.Fatal("expected not-found error")
+	}
+	if err := RemoveMember(root, "squad"); err == nil {
+		t.Fatal("expected reserved error")
+	}
+	if err := RemoveMember(root, "Squad"); err == nil {
+		t.Fatal("expected reserved error")
+	}
+	if _, err := os.Stat(filepath.Join(root, ".opencode", "agents", "squad.md")); err != nil {
+		t.Fatal("squad.md must not be deleted")
+	}
+}

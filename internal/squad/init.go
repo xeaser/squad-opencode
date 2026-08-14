@@ -13,7 +13,18 @@ import (
 
 // WriteDefaultPreset scaffolds .squad/ and .opencode/ into projectRoot.
 // Idempotent: if already initialized and Force is false, no files are written.
+// When opts.Global is set, projectRoot is GlobalSquadDir() (created if missing).
 func WriteDefaultPreset(opts InitOptions) (InitResult, error) {
+	if opts.Global {
+		root, err := GlobalSquadDir()
+		if err != nil {
+			return InitResult{}, err
+		}
+		if err := os.MkdirAll(root, 0o755); err != nil {
+			return InitResult{}, err
+		}
+		opts.ProjectRoot = root
+	}
 	root := opts.ProjectRoot
 	if root == "" {
 		return InitResult{}, fmt.Errorf("project root is required")

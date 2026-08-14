@@ -1,0 +1,46 @@
+name: Bug report
+description: Something squad-oc does wrong
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Search existing issues first. Do not paste secrets or API keys.
+  - type: input
+    id: version
+    attributes:
+      label: squad-oc version
+      description: Output of `squad-oc version`
+      placeholder: "0.3.0"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      placeholder: Windows 11 / macOS 15 / Ubuntu 24.04
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: Command you ran and what you expected.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduce
+      description: Minimal steps. Prefer a throwaway dir, not a private app.
+      placeholder: |
+        1. squad-oc init --preset default
+        2. …
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      render: text
+      description: Redact tokens. `squad-oc doctor` output helps.

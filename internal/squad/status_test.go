@@ -1,0 +1,97 @@
+package squad
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func TestStatusReport(t *testing.T) {
+	root := t.TempDir()
+	if _, err := WriteDefaultPreset(InitOptions{
+		ProjectRoot:        root,
+		Preset:             "default",
+		ProjectDescription: "status test",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	decPath := filepath.Join(ResolveDir(root), "decisions.md")
+	decBody := `# Decisions
+
+Append new decisions at the top (newest first).
+
+### 2026-08-14 — Ship richer status
+
+- **Status:** accepted
+- **Context:** Task 4
+- **Decision:** Extract StatusReport
+- **Consequences:** Testable status output
+
+`
+	if err := os.WriteFile(decPath, []byte(decBody), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := StatusReport(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "Host:") {
+		t.Fatalf("missing Host:\n%s", out)
+	}
+	if !strings.Contains(out, "Lead") {
+		t.Fatalf("missing member name:\n%s", out)
+	}
+	if !strings.Contains(out, "Decisions") {
+		t.Fatalf("missing Decisions section:\n%s", out)
+	}
+	if !strings.Contains(out, "Ship richer status") {
+		t.Fatalf("missing decisions excerpt:\n%s", out)
+	}
+	// Title line alone should not be the only decisions content; excerpt skips # title.
+	if strings.Contains(out, "# Decisions\n") {
+		t.Fatalf("decisions excerpt should skip # title:\n%s", out)
+	}
+	// Watch section absent without ralph-status.json
+	if strings.Contains(out, "Watch") {
+		t.Fatalf("unexpected Watch section:\n%s", out)
+	}
+}
+
+func TestStatusReportWatchSection(t *testing.T) {
+	root := t.TempDir()
+	if _, err := WriteDefaultPreset(InitOptions{
+		ProjectRoot: root,
+		Preset:      "default",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	statusPath := filepath.Join(ResolveDir(root), "ralph-status.json")
+	body := `{"lastPoll":"2026-08-14T12:00:00Z","lastSummary":"polled 2 issues"}`
+	if err := os.WriteFile(statusPath, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, err := StatusReport(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "Watch") {
+		t.Fatalf("missing Watch section:\n%s", out)
+	}
+	if !strings.Contains(out, "2026-08-14T12:00:00Z") {
+		t.Fatalf("missing lastPoll:\n%s", out)
+	}
+	if !strings.Contains(out, "polled 2 issues") {
+		t.Fatalf("missing lastSummary:\n%s", out)
+	}
+}
+
+func TestStatusReportNotInitialized(t *testing.T) {
+	root := t.TempDir()
+	_, err := StatusReport(root)
+	if err == nil {
+		t.Fatal("expected error when not initialized")
+	}
+}
