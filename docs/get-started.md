@@ -116,8 +116,6 @@ squad-oc init --preset default --description "Recipe sharing app with React and 
 
 Re-running `init` is safe (no overwrite once `.squad/config.json` exists).
 
-Other commands (see `squad-oc help` and the README examples): `run -p` against a live OpenCode server, `watch --once` / overnight windows, `export`/`import`, `nap`, `scrub-emails`, `upstream` / `pack`, `link`, `cast --add` / `recast`.
-
 To refresh OpenCode agents/skills after a `squad-oc` update (team files stay put):
 
 ```bash
@@ -143,6 +141,18 @@ squad-oc run --url http://127.0.0.1:5000 -p "Summarize .squad/team.md"
 ```
 
 Plain `opencode` opens the interactive UI and does **not** listen on 4096.
+
+---
+
+## Also useful
+
+- `squad-oc cast --add Designer --role Design` then OpenCode sees `@designer` after recast
+- `squad-oc link ~/teams/platform` to share one `.squad/` across repos (`link --off` to detach)
+- `squad-oc watch --execute --overnight-start 18:00 --overnight-end 08:00`
+- `squad-oc run -p "…"` starts `opencode serve` on `127.0.0.1:4096` if nothing is there; a custom `--url` never auto-starts
+- `squad-oc pack <path|git-url>` or `squad-oc upstream add <name> <path|git-url>` to pull extra agents/skills (see README)
+
+`export`/`import`, `nap`, `scrub-emails`, and the rest are in `squad-oc help` and the README.
 
 ---
 

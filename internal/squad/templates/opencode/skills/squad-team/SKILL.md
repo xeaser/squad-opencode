@@ -23,6 +23,7 @@ Use this skill whenever you are the **squad** coordinator or doing multi-role wo
 1. Propose Lead, Frontend, Backend, Tester (or current `.squad/team.md`).
 2. Wait for human **yes** or edits.
 3. Update `.squad/team.md` if the cast changes.
+4. After file edits, run `squad-oc recast` so `.opencode/agents/` matches the team.
 
 ## Routing
 

@@ -18,4 +18,4 @@ Append new decisions at the top (newest first).
 - **Status:** accepted
 - **Context:** New project bootstrap via `squad-oc init --preset default`
 - **Decision:** Use Lead, Frontend, Backend, Tester under OpenCode
-- **Consequences:** Small team; add roles later by editing `.squad/` and `.opencode/agents/`
+- **Consequences:** Small team; add roles later via `squad-oc cast --add` (or edit `team.md` and run `squad-oc recast`)
