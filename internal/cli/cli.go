@@ -91,6 +91,7 @@ Commands:
   doctor
   status | cast
   cast --add <name> [--role <role>]
+  cast --remove <name>
   recast
   run -p <prompt> | --file <path> [--agent name] [--url]
   watch [--execute] [--interval minutes] [--once] [--url]
@@ -241,13 +242,16 @@ func cmdStatus() int {
 }
 
 func cmdCast(args []string) int {
-	var add, role string
+	var add, role, remove string
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch {
 		case a == "--add" && i+1 < len(args):
 			i++
 			add = args[i]
+		case a == "--remove" && i+1 < len(args):
+			i++
+			remove = args[i]
 		case a == "--role" && i+1 < len(args):
 			i++
 			role = args[i]
@@ -259,12 +263,29 @@ func cmdCast(args []string) int {
 			return 2
 		}
 	}
-	if add == "" {
+	if add != "" && remove != "" {
+		fmt.Fprintln(os.Stderr, "cast: use --add or --remove, not both")
+		return 2
+	}
+	if add == "" && remove == "" {
 		return cmdStatus()
 	}
 	root, code := cwd()
 	if code != 0 {
 		return code
+	}
+	if remove != "" {
+		if err := squad.RemoveMember(root, remove); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		res, err := squad.Recast(root)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		fmt.Printf("removed %s; recast %d agent file(s)\n", remove, res.Written)
+		return 0
 	}
 	if err := squad.AddMember(root, add, role); err != nil {
 		fmt.Fprintln(os.Stderr, err)

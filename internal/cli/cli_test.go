@@ -58,3 +58,34 @@ func TestRunRequiresPrompt(t *testing.T) {
 		t.Fatal()
 	}
 }
+
+func TestCastRemoveViaCLI(t *testing.T) {
+	root := t.TempDir()
+	prev, _ := os.Getwd()
+	if err := os.Chdir(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(prev) })
+
+	if code := Execute([]string{"init", "--preset", "default", "--description", "cli"}); code != 0 {
+		t.Fatal("init")
+	}
+	if code := Execute([]string{"cast", "--remove", "Tester"}); code != 0 {
+		t.Fatal("remove")
+	}
+	if _, err := os.Stat(filepath.Join(root, ".opencode", "agents", "tester.md")); !os.IsNotExist(err) {
+		t.Fatal("host agent should be gone")
+	}
+	if _, err := os.Stat(filepath.Join(root, ".squad", "agents", "tester", "charter.md")); err != nil {
+		t.Fatal("charter should remain")
+	}
+	if _, err := os.Stat(filepath.Join(root, ".opencode", "agents", "squad.md")); err != nil {
+		t.Fatal("squad.md should remain")
+	}
+	if Execute([]string{"cast", "--remove", "Nobody"}) == 0 {
+		t.Fatal("missing member should fail")
+	}
+	if Execute([]string{"cast", "--add", "X", "--remove", "Y"}) != 2 {
+		t.Fatal("add and remove together should fail")
+	}
+}
