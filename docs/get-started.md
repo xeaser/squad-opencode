@@ -116,7 +116,7 @@ squad-oc init --preset default --description "Recipe sharing app with React and 
 
 Re-running `init` is safe (no overwrite once `.squad/config.json` exists).
 
-Other commands (see `squad-oc help`): `run -p` against a live OpenCode server, `watch --once` for issue triage, `export`/`import`, `nap`, `scrub-emails`.
+Other commands (see `squad-oc help` and the README examples): `run -p` against a live OpenCode server, `watch --once` / overnight windows, `export`/`import`, `nap`, `scrub-emails`, `upstream` / `pack`, `link`, `cast --add` / `recast`.
 
 To refresh OpenCode agents/skills after a `squad-oc` update (team files stay put):
 
@@ -134,14 +134,12 @@ squad-oc status
 
 `doctor` uses the **OpenCode Go SDK** for an *optional* server probe (`http://127.0.0.1:4096`). Missing server is soft; missing OpenCode binary or scaffold is hard.
 
-`squad-oc run` and `watch --execute` need the **HTTP API**, not the TUI:
+`squad-oc run` and `watch --execute` use the **HTTP API**, not the TUI. If nothing is listening on `http://127.0.0.1:4096`, they start `opencode serve` there. They will **not** start a server if you pass `--url` or set `OPENCODE_BASE_URL` to anything else.
 
 ```bash
-# terminal 1 — headless API on :4096
-opencode serve
-
-# terminal 2
 squad-oc run -p "Summarize .squad/team.md"
+# or, if you already run serve on another port:
+squad-oc run --url http://127.0.0.1:5000 -p "Summarize .squad/team.md"
 ```
 
 Plain `opencode` opens the interactive UI and does **not** listen on 4096.
@@ -229,6 +227,6 @@ squad-oc status
 
 ## Out of scope
 
-Copilot, an Ink/`squad` shell, Aspire, auto-starting `opencode serve`, and recast/`cast --add`.
+Copilot, an Ink/`squad` shell, and Aspire.
 
 `run` / `watch --execute` use **`github.com/sst/opencode-sdk-go`** against `opencode serve` (not the “OpenCode Go” model subscription, and not the TUI).

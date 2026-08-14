@@ -26,8 +26,7 @@ mkdir my-app && cd my-app && git init
 opencode
 # Tab → squad agent → "Set up the team for …" → yes
 
-# HTTP API for `run` / `watch --execute` (separate terminal)
-opencode serve
+# HTTP API: run auto-starts `opencode serve` on :4096 if nothing is there
 squad-oc run -p "Summarize .squad/team.md"
 ```
 
@@ -52,12 +51,14 @@ OpenCode creates `.opencode/package.json` (`@opencode-ai/plugin`) and runs an in
 | `init` | Scaffold `.squad/` + `.opencode/` |
 | `upgrade` | Refresh host templates; never wipe team state |
 | `doctor` / `status` / `cast` | Health and team table |
-| `run -p` | Prompt `opencode serve` (HTTP API on :4096) as `squad` |
-| `watch [--execute] [--once]` | Issue triage (Ralph); execute uses `run` |
+| `cast --add` / `recast` | Add a member; regenerate `.opencode/agents` from `.squad/team.md` |
+| `run -p` | Prompt the OpenCode HTTP API as `squad`; auto-starts `opencode serve` on :4096 only |
+| `watch [--execute] [--once] [--overnight-start/--overnight-end]` | Issue triage (Ralph); execute uses `run` |
 | `export` / `import` | JSON snapshot of `.squad/` |
-| `externalize` / `internalize` | Move team state out of the worktree |
+| `externalize` / `internalize` | Move *this* project's team out of the worktree |
 | `nap` / `scrub-emails` | Context and PII hygiene |
-| `upstream` / `pack` / `link` | Template sources, packs, shared team |
+| `upstream` / `pack` | Pull extra agents/skills from a folder or git repo |
+| `link` / `link --off` | Share one team directory across several repos |
 | `update-check` | Prints `up to date` or `update available` vs GitHub latest tag |
 
 ## Layout
@@ -85,19 +86,92 @@ squad-oc (Go)
 
 `opencode` (TUI) and `opencode serve` (HTTP API) are different. Only **serve** works with `run` and `watch --execute`.
 
+`run` / `watch --execute` attach to an existing server, or start `opencode serve --hostname 127.0.0.1 --port 4096` in this project. They **never** auto-start if `--url` or `OPENCODE_BASE_URL` is anything other than `http://127.0.0.1:4096` / `http://localhost:4096`. The serve process is left running.
+
 `upgrade` refreshes host templates (`.opencode/`). It never overwrites team memory (`team.md`, decisions, knowledge).
 
 `upgrade --self` is not wired yet — rebuild with `go install ./cmd/squad-oc` (or `go build`).
 
+### Share extra agents (`upstream` / `pack`)
+
+Your company keeps a **security pack** — extra OpenCode agents and a Designer charter — in a git repo or a folder on disk.
+
+```bash
+# One-shot: drop those files into *this* project
+squad-oc pack https://github.com/acme/squad-security-pack.git
+# or a local folder you already cloned
+squad-oc pack ~/packs/security
+
+# Remember it and pull again when the pack updates
+squad-oc upstream add security https://github.com/acme/squad-security-pack.git
+squad-oc upstream sync security     # next quarter: same command
+squad-oc upstream list
+```
+
+`pack` / `sync` refresh `.opencode/` (agents, skills, commands). New `.squad/agents/<name>/` files are added only if missing. `team.md`, decisions, and existing knowledge are never overwritten.
+
+A pack is just a directory that contains `.opencode/` (or a bare `agents/` / `skills/` / `commands/` tree). Optional `.squad/agents/…` stubs are fine.
+
+### Share one team across repos (`link`)
+
+Platform Lead, decisions, and knowledge live in **one** place. Billing and Checkout both use that team.
+
+```bash
+# once: a dedicated team folder (or any repo that already has .squad/)
+mkdir -p ~/teams/platform && cd ~/teams/platform
+git init && squad-oc init --preset default --description "Platform team"
+
+cd ~/code/billing
+squad-oc init --preset default
+squad-oc link ~/teams/platform          # also accepts ~/teams/platform/.squad
+
+cd ~/code/checkout
+squad-oc init --preset default
+squad-oc link ~/teams/platform
+
+squad-oc status                         # both show the same members
+# later
+squad-oc link --off                     # this repo uses its local .squad/ again
+```
+
+`link` does not move files. Config stays in each repo; `team.md` / charters / decisions are read from the shared directory. Cannot combine with `externalize` (that *moves* this project's own team out of the worktree).
+
+### Change the cast (`cast --add` / `recast`)
+
+```bash
+squad-oc cast --add Designer --role Design
+# appends Designer to team.md, writes charter/knowledge, regenerates .opencode/agents
+
+# or edit .squad/team.md by hand, then:
+squad-oc recast
+```
+
+OpenCode only sees agents that exist under `.opencode/agents/`. Recast is what makes a new row in `team.md` show up as `@designer`. It never touches `squad.md` (the coordinator).
+
+### Overnight watch
+
+```bash
+# poll and execute during the day; sleep 18:00–08:00 local
+squad-oc watch --execute --interval 10 --overnight-start 18:00 --overnight-end 08:00
+```
+
+During the quiet window it does not call `opencode serve`. Stop anytime with `touch .squad/ralph-stop`.
+
+## Later
+
+Not in this release:
+
+- **Release binaries** / a real `upgrade --self` (goreleaser for windows/linux/darwin)
+- **Agent traces** via OpenTelemetry GenAI (not Aspire). Goal: a self-contained `squad-oc traces` (or similar) plus export that any OTEL backend can scrape
+- Watch state backends (`git-notes`)
+
 ## Non-goals
 
-- Copilot CLI / Copilot SDK
+Original-Squad / Copilot-host pieces we are not building:
+
+- GitHub Copilot CLI / Copilot SDK
 - Interactive Ink/`squad` shell (use the OpenCode TUI)
-- Aspire / .NET dashboard
-- npm as the primary distribution
-- Auto-spawning `opencode serve` from `run` (start it yourself)
-- Recast / generate agents from `.squad/` (not yet)
-- Overnight watch windows and git-notes backends
+- Aspire / .NET dashboard (traces, if any, will be OTEL)
 
 ## Develop
 
