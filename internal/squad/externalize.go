@@ -34,6 +34,9 @@ func Externalize(projectRoot, key string) (string, error) {
 func ExternalizeTo(projectRoot, dest string) (string, error) {
 	src := SquadDir(projectRoot)
 	cfg := Detect(projectRoot).Config
+	if cfg != nil && cfg.LinkPath != "" {
+		return "", fmt.Errorf("already linked to %s — unlink first", cfg.LinkPath)
+	}
 	if _, err := CopyTree(src, dest); err != nil {
 		return "", err
 	}
@@ -84,5 +87,3 @@ func clearDirExceptConfig(dir string) error {
 	}
 	return nil
 }
-
-

@@ -11,7 +11,7 @@ func ConfigPath(projectRoot string) string {
 }
 
 func TeamPath(projectRoot string) string {
-	return filepath.Join(SquadDir(projectRoot), "team.md")
+	return filepath.Join(ResolveDir(projectRoot), "team.md")
 }
 
 func OpencodeAgentsDir(projectRoot string) string {

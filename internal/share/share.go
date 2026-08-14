@@ -277,21 +277,19 @@ func writeFile(src, dest string) error {
 	return os.WriteFile(dest, data, 0o644)
 }
 
-// Link records a shared team directory.
-func Link(projectRoot, teamPath string) error {
-	if !squad.IsInitialized(projectRoot) {
-		return fmt.Errorf("not initialized")
+// Link points this project at a shared team (project root or .squad dir).
+func Link(projectRoot, teamPath string) (string, error) {
+	dest, err := squad.ResolveLinkTarget(teamPath)
+	if err != nil {
+		return "", err
 	}
-	st, err := os.Stat(teamPath)
-	if err != nil || !st.IsDir() {
-		return fmt.Errorf("team path must be an existing directory")
+	if err := squad.SetLink(projectRoot, dest); err != nil {
+		return "", err
 	}
-	det := squad.Detect(projectRoot)
-	cfg := squad.Config{Version: 1, Host: "opencode", Preset: "default"}
-	if det.Config != nil {
-		cfg = *det.Config
-	}
-	abs, _ := filepath.Abs(teamPath)
-	cfg.LinkPath = abs
-	return squad.SaveConfig(projectRoot, cfg)
+	return dest, nil
+}
+
+// Unlink clears the shared-team pointer.
+func Unlink(projectRoot string) error {
+	return squad.ClearLink(projectRoot)
 }

@@ -141,14 +141,27 @@ func TestApplySourceMissing(t *testing.T) {
 
 func TestLink(t *testing.T) {
 	root := t.TempDir()
+	other := t.TempDir()
 	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
 		t.Fatal(err)
 	}
-	other := t.TempDir()
-	if err := Link(root, other); err != nil {
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: other, ProjectDescription: "shared"}); err != nil {
 		t.Fatal(err)
+	}
+	dest, err := Link(root, other)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dest != squad.SquadDir(other) {
+		t.Fatal(dest)
 	}
 	if squad.Detect(root).Config.LinkPath == "" {
 		t.Fatal("expected link")
+	}
+	if err := Unlink(root); err != nil {
+		t.Fatal(err)
+	}
+	if squad.Detect(root).Config.LinkPath != "" {
+		t.Fatal("expected unlink")
 	}
 }
