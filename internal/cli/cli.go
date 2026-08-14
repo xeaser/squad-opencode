@@ -204,40 +204,12 @@ func cmdStatus() int {
 		fmt.Fprintln(os.Stderr, "Not initialized. Run: squad-oc init --preset default")
 		return 1
 	}
-	det := squad.Detect(root)
-	members, err := squad.ReadTeam(root)
+	out, err := squad.StatusReport(root)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
-	fmt.Printf("Squad status — %s\n", root)
-	if det.Config != nil {
-		fmt.Printf("Host: %s  Preset: %s\n", det.Config.Host, det.Config.Preset)
-		if det.Config.ProjectDescription != "" {
-			fmt.Printf("Project: %s\n", det.Config.ProjectDescription)
-		}
-		if det.Config.ExternalPath != "" {
-			fmt.Printf("External: %s\n", det.Config.ExternalPath)
-		}
-		if det.Config.LinkPath != "" {
-			fmt.Printf("Link: %s\n", det.Config.LinkPath)
-		}
-	}
-	fmt.Println()
-	if len(members) == 0 {
-		fmt.Println("(no members parsed from team.md)")
-		return 0
-	}
-	width := 4
-	for _, m := range members {
-		if len(m.Name) > width {
-			width = len(m.Name)
-		}
-	}
-	fmt.Printf("%-*s  Role\n%s  ----\n", width, "Name", strings.Repeat("-", width))
-	for _, m := range members {
-		fmt.Printf("%-*s  %s  [%s]\n", width, m.Name, m.Role, m.Status)
-	}
+	fmt.Print(out)
 	return 0
 }
 
