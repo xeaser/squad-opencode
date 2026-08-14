@@ -191,6 +191,47 @@ func TestImportWithHostRejectsCraftedHostPaths(t *testing.T) {
 	}
 }
 
+func TestImportRejectsCraftedFilePaths(t *testing.T) {
+	src := primed(t)
+	out := filepath.Join(t.TempDir(), "snap.json")
+	if err := Export(src, out); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var snap Snapshot
+	if err := json.Unmarshal(raw, &snap); err != nil {
+		t.Fatal(err)
+	}
+	if snap.Files == nil {
+		snap.Files = map[string]string{}
+	}
+	snap.Files["../../outside.txt"] = "escaped"
+	snap.Files["../escape.txt"] = "escaped"
+
+	crafted := filepath.Join(t.TempDir(), "crafted.json")
+	b, err := json.MarshalIndent(snap, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(crafted, append(b, '\n'), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	dest := t.TempDir()
+	if err := Import(dest, crafted, false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(filepath.Dir(dest), "outside.txt")); !os.IsNotExist(err) {
+		t.Fatal("../../outside.txt escaped .squad/")
+	}
+	if _, err := os.Stat(filepath.Join(dest, "escape.txt")); !os.IsNotExist(err) {
+		t.Fatal("../escape.txt escaped .squad/")
+	}
+}
+
 func TestExternalizeInternalize(t *testing.T) {
 	root := primed(t)
 	ext := filepath.Join(t.TempDir(), "ext")

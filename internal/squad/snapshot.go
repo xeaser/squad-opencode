@@ -189,7 +189,8 @@ func Import(projectRoot, srcPath string, withHost bool) error {
 		return err
 	}
 	for rel, content := range snap.Files {
-		if shouldSkipExport(rel) {
+		rel, ok := safeProjectRel(rel)
+		if !ok || shouldSkipExport(rel) {
 			continue
 		}
 		dest := filepath.Join(dir, filepath.FromSlash(rel))

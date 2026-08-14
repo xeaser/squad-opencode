@@ -111,9 +111,12 @@ func ParseNotifyLevel(s string) (NotifyLevel, error) {
 }
 
 func passesNotify(opts Options, level NotifyLevel) bool {
+	if opts.Verbose && level == NotifyAll {
+		return true
+	}
 	switch opts.Notify {
 	case NotifyNone:
-		return opts.Verbose && level == NotifyAll
+		return false
 	case NotifyAll:
 		return true
 	default:

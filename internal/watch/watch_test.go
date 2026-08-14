@@ -349,6 +349,34 @@ func TestLoopSetsPIDOnFirstWrite(t *testing.T) {
 	}
 }
 
+func TestPassesNotifyVerboseAtEveryLevel(t *testing.T) {
+	cases := []struct {
+		notify  NotifyLevel
+		verbose bool
+		level   NotifyLevel
+		want    bool
+	}{
+		{NotifyNone, false, NotifyAll, false},
+		{NotifyNone, false, NotifyImportant, false},
+		{NotifyNone, true, NotifyAll, true},
+		{NotifyNone, true, NotifyImportant, false},
+		{NotifyImportant, false, NotifyAll, false},
+		{NotifyImportant, false, NotifyImportant, true},
+		{NotifyImportant, true, NotifyAll, true},
+		{NotifyImportant, true, NotifyImportant, true},
+		{NotifyAll, false, NotifyAll, true},
+		{NotifyAll, false, NotifyImportant, true},
+		{NotifyAll, true, NotifyAll, true},
+	}
+	for _, tc := range cases {
+		got := passesNotify(Options{Notify: tc.notify, Verbose: tc.verbose}, tc.level)
+		if got != tc.want {
+			t.Errorf("notify=%v verbose=%v level=%v: got %v want %v",
+				tc.notify, tc.verbose, tc.level, got, tc.want)
+		}
+	}
+}
+
 func TestNotifyNoneSkipsTriageDump(t *testing.T) {
 	root := t.TempDir()
 	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
