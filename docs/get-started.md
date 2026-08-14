@@ -11,7 +11,7 @@ Zero to first team. You do **not** need GitHub Copilot, Node, or the original Sq
 | Need | Why |
 |------|-----|
 | Terminal | Install and run tools |
-| **Go 1.22+** (to build `squad-oc`) | Or a prebuilt binary when published |
+| **Go 1.26.6+** (to build `squad-oc`) | Or a prebuilt binary when published |
 | Git | Project + recommended for real work |
 | An LLM provider | OpenCode talks to a model |
 
@@ -249,7 +249,7 @@ squad-oc status
 | No **squad** agent | `squad-oc init --preset default` in project root |
 | `Not initialized` | `squad-oc init --preset default` |
 | Server probe FAIL only | Soft check — run `opencode serve` for the HTTP API on :4096 |
-| Build fails | `go version` ≥ 1.22; `go mod tidy` |
+| Build fails | `go version` ≥ 1.26.6; `go mod tidy` |
 
 ---
 

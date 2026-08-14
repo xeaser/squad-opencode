@@ -1,6 +1,6 @@
 module github.com/xeaser/squad-opencode
 
-go 1.22
+go 1.26.6
 
 require github.com/sst/opencode-sdk-go v0.19.2
 

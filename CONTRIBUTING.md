@@ -19,7 +19,7 @@ go test ./...
 go build -o squad-oc ./cmd/squad-oc
 ```
 
-Requires **Go 1.22+**. Optional live check (dummy project only, never this clone as the serve cwd unless you mean to dogfood):
+Requires **Go 1.26.6+**. Optional live check (dummy project only, never this clone as the serve cwd unless you mean to dogfood):
 
 ```powershell
 ./scripts/live-e2e.ps1
