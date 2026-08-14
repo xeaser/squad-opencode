@@ -61,7 +61,7 @@ func safeProjectRel(rel string) (string, bool) {
 	if clean == ".." || strings.HasPrefix(clean, "../") {
 		return "", false
 	}
-	return rel, true
+	return clean, true
 }
 
 func collectHostFiles(projectRoot string) (map[string]string, error) {
@@ -219,7 +219,7 @@ func Import(projectRoot, srcPath string, withHost bool) error {
 func writeHostFiles(projectRoot string, files map[string]string) error {
 	for rel, content := range files {
 		rel, ok := safeProjectRel(rel)
-		if !ok || shouldSkipHost(rel) {
+		if !ok || shouldSkipHost(rel) || !isHostRel(rel) {
 			continue
 		}
 		if rel == "opencode.json" {

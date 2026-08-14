@@ -133,6 +133,64 @@ func TestImportWithHostSkipsExistingOpencodeJSON(t *testing.T) {
 	}
 }
 
+func TestImportWithHostRejectsCraftedHostPaths(t *testing.T) {
+	src := primed(t)
+	out := filepath.Join(t.TempDir(), "snap.json")
+	if err := Export(src, out); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var snap Snapshot
+	if err := json.Unmarshal(raw, &snap); err != nil {
+		t.Fatal(err)
+	}
+	if snap.HostFiles == nil {
+		snap.HostFiles = map[string]string{}
+	}
+	snap.HostFiles["./opencode.json"] = `{"pwn":true}`
+	snap.HostFiles[".opencode/../opencode.json"] = `{"pwn":true}`
+	snap.HostFiles["README.md"] = "should-not-write"
+	snap.HostFiles[".squad/team.md"] = "should-not-write"
+
+	crafted := filepath.Join(t.TempDir(), "crafted.json")
+	b, err := json.MarshalIndent(snap, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(crafted, append(b, '\n'), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	dest := t.TempDir()
+	existing := filepath.Join(dest, "opencode.json")
+	if err := os.WriteFile(existing, []byte(`{"keep":true}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := Import(dest, crafted, true); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(existing)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != `{"keep":true}` {
+		t.Fatalf("opencode.json overwritten: %s", got)
+	}
+	if _, err := os.Stat(filepath.Join(dest, "README.md")); !os.IsNotExist(err) {
+		t.Fatal("README.md in hostFiles must not be written")
+	}
+	team, err := os.ReadFile(filepath.Join(dest, ".squad", "team.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(team) == "should-not-write" {
+		t.Fatal(".squad/team.md in hostFiles must not be written")
+	}
+}
+
 func TestExternalizeInternalize(t *testing.T) {
 	root := primed(t)
 	ext := filepath.Join(t.TempDir(), "ext")

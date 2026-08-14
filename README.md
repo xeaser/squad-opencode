@@ -53,16 +53,17 @@ OpenCode creates `.opencode/package.json` (`@opencode-ai/plugin`) and runs an in
 | `doctor` | Health checks |
 | `status` / `cast` | Team table |
 | `cast --add <name> [--role <role>]` | Add a member and regenerate `.opencode/agents` |
+| `cast --remove <name>` | Remove a member and regenerate `.opencode/agents` |
 | `recast` | Regenerate `.opencode/agents` from `.squad/team.md` |
 | `run -p <prompt>` / `--file <path> [--agent name] [--url]` | Prompt the OpenCode HTTP API as `squad`; auto-starts `opencode serve` on :4096 only |
 | `watch [--execute] [--interval minutes] [--once] [--url] [--overnight-start HH:MM] [--overnight-end HH:MM]` | Issue triage (Ralph); execute uses `run` |
-| `export [file]` / `import <file>` | JSON snapshot of `.squad/` |
+| `export [file]` / `import <file> [--with-host]` | JSON snapshot of `.squad/` (optional host files) |
 | `externalize [--key name]` / `internalize` | Move *this* project's team out of the worktree |
 | `nap [--dry-run] [--deep]` / `scrub-emails [directory]` | Context and PII hygiene |
 | `upstream add <name> <path\|git-url>` / `list` / `remove` / `sync` | Remember and pull extra agents/skills |
 | `pack <path\|git-url>` | One-shot pull of extra agents/skills |
 | `link <team-dir>` / `link --off` | Share one team directory across several repos |
-| `update-check` | Prints `up to date` or `update available` vs GitHub latest tag |
+| `update-check [--json] [--refresh]` | Prints `up to date` or `update available` vs GitHub latest tag |
 | `help` / `version` | Usage and version string |
 
 ## Layout
