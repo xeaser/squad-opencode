@@ -19,6 +19,29 @@ func TestHelpAndUnknown(t *testing.T) {
 	}
 }
 
+func TestAliasDispatch(t *testing.T) {
+	root := t.TempDir()
+	prev, _ := os.Getwd()
+	if err := os.Chdir(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(prev) })
+
+	if Execute([]string{"nope"}) != 2 {
+		t.Fatal("unknown still 2")
+	}
+	// heartbeat/triage/loop must be recognized (not unknown exit 2)
+	if code := Execute([]string{"heartbeat"}); code == 2 {
+		t.Fatal("heartbeat should not be unknown")
+	}
+	if code := Execute([]string{"triage", "--once"}); code == 2 {
+		t.Fatal("triage should not be unknown")
+	}
+	if code := Execute([]string{"loop", "--once"}); code == 2 {
+		t.Fatal("loop should not be unknown")
+	}
+}
+
 func TestInitExportImportViaCLI(t *testing.T) {
 	root := t.TempDir()
 	prev, _ := os.Getwd()
