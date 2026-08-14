@@ -10,7 +10,7 @@ import (
 
 // Escalator runs one recovery step after a failed watch pass.
 type Escalator interface {
-	Reset(ctx context.Context) error      // tier 1
+	Reset(ctx context.Context) error       // tier 1
 	ReprobeAuth(ctx context.Context) error // tier 2 — `gh auth status`
 	GitPull(ctx context.Context) error     // tier 3
 }

@@ -209,4 +209,3 @@ func TestUpgradeHostFilesGlobal(t *testing.T) {
 		t.Fatal("description lost")
 	}
 }
-
