@@ -100,6 +100,7 @@ Commands:
   watch | triage | loop [--execute] [--interval minutes] [--once] [--health] [--url]
       [--overnight-start HH:MM] [--overnight-end HH:MM] [--label name]
       [--log-file path] [--verbose] [--notify-level all|important|none]
+      [--state-backend memory|git-notes|orphan-branch]
   export [file]
   import <file> [--with-host]
   externalize [--key name]
@@ -422,7 +423,7 @@ func cmdWatch(args []string) int {
 	interval := 10
 	verbose := false
 	notifyLevel := watch.NotifyImportant
-	var overnightStart, overnightEnd, apiURL, logFile string
+	var overnightStart, overnightEnd, apiURL, logFile, stateBackend string
 	var labels []string
 	for i := 0; i < len(args); i++ {
 		a := args[i]
@@ -466,6 +467,9 @@ func cmdWatch(args []string) int {
 				return 2
 			}
 			notifyLevel = lvl
+		case a == "--state-backend" && i+1 < len(args):
+			i++
+			stateBackend = args[i]
 		default:
 			fmt.Fprintf(os.Stderr, "Unknown watch flag: %s\n", a)
 			return 2
@@ -475,8 +479,13 @@ func cmdWatch(args []string) int {
 	if code != 0 {
 		return code
 	}
+	backend, err := watch.ParseStateBackend(stateBackend, root)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 2
+	}
 	if health {
-		return cmdWatchHealth(root)
+		return cmdWatchHealth(root, backend)
 	}
 	opts := watch.Options{
 		ProjectRoot:    root,
@@ -492,7 +501,8 @@ func cmdWatch(args []string) int {
 		Logger: func(_ watch.NotifyLevel, msg string) {
 			fmt.Println(msg)
 		},
-		Lister: githubissues.GHLister{Dir: root, Labels: labels},
+		Backend: backend,
+		Lister:  githubissues.GHLister{Dir: root, Labels: labels},
 	}
 	if exec {
 		ensured, code := ensureAPI(apiURL, root)
@@ -514,15 +524,29 @@ func cmdWatch(args []string) int {
 	return watchLoop(opts)
 }
 
-func cmdWatchHealth(root string) int {
-	h, err := watch.ReadHealth(root)
-	if err != nil {
-		if os.IsNotExist(err) {
+func cmdWatchHealth(root string, backend watch.StateBackend) int {
+	var h watch.Health
+	var err error
+	if backend != nil {
+		h, err = backend.Load(context.Background())
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		if h.PID == 0 && h.Round == 0 && h.StartedAt.IsZero() {
 			fmt.Println("no watch status (start: squad-oc watch)")
 			return 1
 		}
-		fmt.Fprintln(os.Stderr, err)
-		return 1
+	} else {
+		h, err = watch.ReadHealth(root)
+		if err != nil {
+			if os.IsNotExist(err) {
+				fmt.Println("no watch status (start: squad-oc watch)")
+				return 1
+			}
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
 	}
 	fmt.Print(watch.FormatHealth(h, time.Now()))
 	return 0

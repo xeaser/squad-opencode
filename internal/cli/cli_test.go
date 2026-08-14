@@ -49,6 +49,12 @@ func TestAliasDispatch(t *testing.T) {
 	if Execute([]string{"watch", "--notify-level", "nope"}) != 2 {
 		t.Fatal("invalid --notify-level should be 2")
 	}
+	if Execute([]string{"watch", "--state-backend", "nope"}) != 2 {
+		t.Fatal("invalid --state-backend should be 2")
+	}
+	if code := Execute([]string{"watch", "--state-backend", "memory", "--health"}); code == 2 {
+		t.Fatal("--state-backend memory should not be unknown")
+	}
 }
 
 func TestInitExportImportViaCLI(t *testing.T) {

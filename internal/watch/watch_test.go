@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -439,5 +440,106 @@ func TestLoopOnceDoesNotEscalate(t *testing.T) {
 	}
 	if len(esc.calls) != 0 {
 		t.Fatalf("escalated on --once: %v", esc.calls)
+	}
+}
+
+func initTempRepo(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	run := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		cmd.Env = append(os.Environ(),
+			"GIT_AUTHOR_NAME=test",
+			"GIT_AUTHOR_EMAIL=test@example.com",
+			"GIT_COMMITTER_NAME=test",
+			"GIT_COMMITTER_EMAIL=test@example.com",
+		)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	run("init")
+	run("config", "user.email", "test@example.com")
+	run("config", "user.name", "test")
+	run("commit", "--allow-empty", "-m", "init")
+	return dir
+}
+
+func TestGitNotesBackendRoundTrip(t *testing.T) {
+	dir := initTempRepo(t)
+	b := GitNotesBackend{Dir: dir}
+	want := Health{PID: 7, Round: 3, LastSummary: "issues=1 execute=false"}
+	if err := b.Save(context.Background(), want); err != nil {
+		t.Fatal(err)
+	}
+	got, err := b.Load(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.PID != 7 || got.Round != 3 || got.LastSummary != want.LastSummary {
+		t.Fatalf("%+v", got)
+	}
+}
+
+func TestGitNotesBackendFreshHEAD(t *testing.T) {
+	dir := initTempRepo(t)
+	got, err := (GitNotesBackend{Dir: dir}).Load(context.Background())
+	if err != nil || got.PID != 0 || got.Round != 0 {
+		t.Fatalf("%+v %v", got, err)
+	}
+}
+
+func TestGitNotesBackendRequiresRepo(t *testing.T) {
+	err := (GitNotesBackend{Dir: t.TempDir()}).Save(context.Background(), Health{PID: 1})
+	if err == nil {
+		t.Fatal("want repo error")
+	}
+}
+
+func TestOrphanBranchBackendRoundTrip(t *testing.T) {
+	dir := initTempRepo(t)
+	headCmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+	headCmd.Dir = dir
+	before, err := headCmd.Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := OrphanBranchBackend{Dir: dir}
+	want := Health{PID: 11, Round: 4, LastSummary: "ok"}
+	if err := b.Save(context.Background(), want); err != nil {
+		t.Fatal(err)
+	}
+	got, err := b.Load(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.PID != 11 || got.Round != 4 || got.LastSummary != want.LastSummary {
+		t.Fatalf("%+v", got)
+	}
+	headCmd = exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+	headCmd.Dir = dir
+	after, err := headCmd.Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(string(after)) != strings.TrimSpace(string(before)) {
+		t.Fatalf("worktree moved: %s -> %s", before, after)
+	}
+	if strings.Contains(string(after), "ralph-state") {
+		t.Fatal("checked out orphan branch")
+	}
+}
+
+func TestMemoryBackend(t *testing.T) {
+	m := &MemoryBackend{}
+	if err := m.Save(context.Background(), Health{PID: 1, Round: 2}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := m.Load(context.Background())
+	if err != nil || got.PID != 1 || got.Round != 2 {
+		t.Fatalf("%+v %v", got, err)
 	}
 }

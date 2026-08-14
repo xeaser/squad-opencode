@@ -54,6 +54,33 @@ type Options struct {
 	Escalator      Escalator
 	Backoff        time.Duration
 	Sleep          func(time.Duration)
+	Backend        StateBackend
+}
+
+func loadHealth(ctx context.Context, opts Options) (Health, error) {
+	if opts.Backend != nil {
+		return opts.Backend.Load(ctx)
+	}
+	if opts.ProjectRoot == "" {
+		return Health{}, nil
+	}
+	h, err := ReadHealth(opts.ProjectRoot)
+	if err != nil && os.IsNotExist(err) {
+		return Health{}, nil
+	}
+	return h, err
+}
+
+func saveHealth(ctx context.Context, opts Options, h Health) error {
+	if opts.Backend != nil {
+		if err := opts.Backend.Save(ctx, h); err != nil {
+			return err
+		}
+	}
+	if opts.ProjectRoot == "" {
+		return nil
+	}
+	return WriteHealth(opts.ProjectRoot, h)
 }
 
 // NotifyLevel selects which watch lines are emitted.
@@ -209,7 +236,7 @@ func clockNow(opts Options) time.Time {
 func Pass(ctx context.Context, opts Options) (executed bool, summary string, err error) {
 	defer func() { writePassHealth(opts, summary, err) }()
 	prevOvernight := false
-	if h, rerr := ReadHealth(opts.ProjectRoot); rerr == nil {
+	if h, rerr := loadHealth(context.Background(), opts); rerr == nil {
 		prevOvernight = h.Overnight
 	}
 	quiet, err := InOvernight(clockNow(opts), opts.OvernightStart, opts.OvernightEnd)
@@ -273,12 +300,12 @@ func Pass(ctx context.Context, opts Options) (executed bool, summary string, err
 }
 
 func writePassHealth(opts Options, summary string, err error) {
-	if opts.ProjectRoot == "" {
+	if opts.ProjectRoot == "" && opts.Backend == nil {
 		return
 	}
 	now := clockNow(opts)
-	h, rerr := ReadHealth(opts.ProjectRoot)
-	if rerr != nil && !os.IsNotExist(rerr) {
+	h, rerr := loadHealth(context.Background(), opts)
+	if rerr != nil {
 		return
 	}
 	h.LastPoll = now
@@ -293,7 +320,7 @@ func writePassHealth(opts Options, summary string, err error) {
 	}
 	quiet, _ := InOvernight(now, opts.OvernightStart, opts.OvernightEnd)
 	h.Overnight = quiet
-	_ = WriteHealth(opts.ProjectRoot, h)
+	_ = saveHealth(context.Background(), opts, h)
 }
 
 // Loop polls until stop sentinel, context cancel, or Once.
@@ -302,13 +329,13 @@ func Loop(ctx context.Context, opts Options) error {
 		opts.Interval = 10 * time.Minute
 	}
 	now := clockNow(opts)
-	h, err := ReadHealth(opts.ProjectRoot)
-	if err != nil && !os.IsNotExist(err) {
+	h, err := loadHealth(ctx, opts)
+	if err != nil {
 		return err
 	}
 	h.PID = os.Getpid()
 	h.StartedAt = now
-	if err := WriteHealth(opts.ProjectRoot, h); err != nil {
+	if err := saveHealth(ctx, opts, h); err != nil {
 		return err
 	}
 	for {
@@ -318,8 +345,8 @@ func Loop(ctx context.Context, opts Options) error {
 		}
 		_, _, err := Pass(ctx, opts)
 		now = clockNow(opts)
-		h, rerr := ReadHealth(opts.ProjectRoot)
-		if rerr != nil && !os.IsNotExist(rerr) {
+		h, rerr := loadHealth(ctx, opts)
+		if rerr != nil {
 			return rerr
 		}
 		h.PID = os.Getpid()
@@ -327,7 +354,7 @@ func Loop(ctx context.Context, opts Options) error {
 			h.StartedAt = now
 		}
 		h.NextPoll = now.Add(opts.Interval)
-		if werr := WriteHealth(opts.ProjectRoot, h); werr != nil {
+		if werr := saveHealth(ctx, opts, h); werr != nil {
 			return werr
 		}
 		if err != nil {
@@ -338,7 +365,7 @@ func Loop(ctx context.Context, opts Options) error {
 			applyEscalation(ctx, opts, h.Consecutive)
 			if tier >= 4 {
 				h.Consecutive = 0
-				if werr := WriteHealth(opts.ProjectRoot, h); werr != nil {
+				if werr := saveHealth(ctx, opts, h); werr != nil {
 					return werr
 				}
 			}
