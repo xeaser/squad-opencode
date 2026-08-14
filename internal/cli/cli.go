@@ -3,6 +3,7 @@ package cli
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -69,7 +70,7 @@ func Execute(args []string) int {
 	case "link":
 		return cmdLink(rest)
 	case "update-check":
-		return cmdUpdateCheck()
+		return cmdUpdateCheck(rest)
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown command: %s\n\n", cmd)
 		printHelp()
@@ -106,7 +107,7 @@ Commands:
   pack <path|git-url>
   link <team-dir>
   link --off
-  update-check
+  update-check [--json] [--refresh]
   help | version
 
 Team state (.squad/) is never wiped by upgrade.
@@ -696,11 +697,34 @@ func cmdLink(args []string) int {
 	return 0
 }
 
-func cmdUpdateCheck() int {
-	res, err := updatecheck.Check(nil)
+func cmdUpdateCheck(args []string) int {
+	var asJSON, refresh bool
+	for _, a := range args {
+		switch a {
+		case "--json":
+			asJSON = true
+		case "--refresh":
+			refresh = true
+		case "--help", "-h":
+			printHelp()
+			return 0
+		default:
+			fmt.Fprintf(os.Stderr, "Unknown update-check flag: %s\n", a)
+			return 2
+		}
+	}
+	res, err := updatecheck.Check(nil, refresh)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
+	}
+	if asJSON {
+		enc := json.NewEncoder(os.Stdout)
+		if err := enc.Encode(res); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		return 0
 	}
 	fmt.Println(res.Message)
 	return 0
