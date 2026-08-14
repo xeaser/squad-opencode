@@ -18,6 +18,7 @@ import (
 	"github.com/xeaser/squad-opencode/internal/selfupdate"
 	"github.com/xeaser/squad-opencode/internal/share"
 	"github.com/xeaser/squad-opencode/internal/squad"
+	"github.com/xeaser/squad-opencode/internal/traces"
 	"github.com/xeaser/squad-opencode/internal/updatecheck"
 	"github.com/xeaser/squad-opencode/internal/version"
 	"github.com/xeaser/squad-opencode/internal/watch"
@@ -73,6 +74,8 @@ func Execute(args []string) int {
 		return cmdLink(rest)
 	case "update-check":
 		return cmdUpdateCheck(rest)
+	case "traces":
+		return cmdTraces(rest)
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown command: %s\n\n", cmd)
 		printHelp()
@@ -113,6 +116,7 @@ Commands:
   link <team-dir>
   link --off
   update-check [--json] [--refresh]
+  traces [--last N] [--json] [--export file]
   help | version
 
 Team state (.squad/) is never wiped by upgrade.
@@ -840,5 +844,73 @@ func cmdUpdateCheck(args []string) int {
 		return 0
 	}
 	fmt.Println(res.Message)
+	return 0
+}
+
+func cmdTraces(args []string) int {
+	last := 20
+	asJSON := false
+	exportPath := ""
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		switch {
+		case a == "--json":
+			asJSON = true
+		case a == "--last" && i+1 < len(args):
+			i++
+			n, err := strconv.Atoi(args[i])
+			if err != nil || n < 0 {
+				fmt.Fprintln(os.Stderr, "invalid --last")
+				return 2
+			}
+			last = n
+		case a == "--export" && i+1 < len(args):
+			i++
+			exportPath = args[i]
+		case a == "--export":
+			fmt.Fprintln(os.Stderr, "traces --export requires a file")
+			return 2
+		case a == "--last":
+			fmt.Fprintln(os.Stderr, "traces --last requires N")
+			return 2
+		case a == "--help" || a == "-h":
+			printHelp()
+			return 0
+		default:
+			fmt.Fprintf(os.Stderr, "Unknown traces flag: %s\n", a)
+			return 2
+		}
+	}
+	root, code := cwd()
+	if code != 0 {
+		return code
+	}
+	spans, err := traces.List(root, last)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if exportPath != "" {
+		if !filepath.IsAbs(exportPath) {
+			exportPath = filepath.Join(root, exportPath)
+		}
+		if err := traces.ExportOTLPFile(spans, exportPath); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		fmt.Println("exported", exportPath)
+		if !asJSON {
+			return 0
+		}
+	}
+	if asJSON {
+		enc := json.NewEncoder(os.Stdout)
+		if err := enc.Encode(spans); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		return 0
+	}
+	fmt.Print(traces.FormatTable(spans))
 	return 0
 }
