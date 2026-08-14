@@ -72,6 +72,54 @@ func AddMember(projectRoot, name, role string) error {
 	return nil
 }
 
+// RemoveMember drops a team.md row and the host agent file. Knowledge stays.
+func RemoveMember(projectRoot, name string) error {
+	if !IsInitialized(projectRoot) {
+		return fmt.Errorf("not initialized")
+	}
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return fmt.Errorf("name required")
+	}
+	id := memberID(name)
+	if id == "squad" {
+		return fmt.Errorf("%q is reserved for the coordinator agent", name)
+	}
+	members, err := ReadTeam(projectRoot)
+	if err != nil {
+		return err
+	}
+	var found TeamMember
+	ok := false
+	for _, m := range members {
+		if m.ID == id || strings.EqualFold(m.Name, name) {
+			found = m
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("member %q not found", name)
+	}
+	teamFile := filepath.Join(ResolveDir(projectRoot), "team.md")
+	raw, err := os.ReadFile(teamFile)
+	if err != nil {
+		return err
+	}
+	next, err := removeMemberRow(string(raw), found)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(teamFile, []byte(next), 0o644); err != nil {
+		return err
+	}
+	host := filepath.Join(OpencodeAgentsDir(projectRoot), found.ID+".md")
+	if err := os.Remove(host); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
 func memberID(name string) string {
 	return strings.ToLower(strings.ReplaceAll(strings.TrimSpace(name), " ", "-"))
 }
@@ -113,6 +161,42 @@ func insertLine(lines []string, at int, row string) string {
 	out = append(out, row)
 	out = append(out, lines[at:]...)
 	return strings.Join(out, "\n")
+}
+
+func removeMemberRow(content string, member TeamMember) (string, error) {
+	hasMembers := reMembersHeading.MatchString(content)
+	inMembers := !hasMembers
+	lines := strings.Split(content, "\n")
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(strings.TrimSuffix(line, "\r"))
+		if reMembersHeading.MatchString(trimmed) {
+			inMembers = true
+			continue
+		}
+		if hasMembers && reAnyHeading.MatchString(trimmed) && !reMembersHeading.MatchString(trimmed) {
+			inMembers = false
+			continue
+		}
+		if !inMembers || !strings.HasPrefix(trimmed, "|") {
+			continue
+		}
+		if reTableSep.MatchString(trimmed) || reNameHeader.MatchString(trimmed) {
+			continue
+		}
+		cells := splitTableCells(trimmed)
+		if len(cells) < 2 {
+			continue
+		}
+		name := cells[0]
+		rowID := strings.ToLower(strings.ReplaceAll(name, " ", "-"))
+		if rowID == member.ID || strings.EqualFold(name, member.Name) {
+			out := make([]string, 0, len(lines)-1)
+			out = append(out, lines[:i]...)
+			out = append(out, lines[i+1:]...)
+			return strings.Join(out, "\n"), nil
+		}
+	}
+	return "", fmt.Errorf("member %q not found", member.Name)
 }
 
 func defaultCharter(name, role, id string) string {
