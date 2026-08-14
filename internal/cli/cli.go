@@ -94,8 +94,9 @@ Commands:
   internalize
   nap [--dry-run] [--deep]
   scrub-emails [directory]
-  upstream add|list|remove|sync ...
-  pack <dir>
+  upstream add <name> <path|git-url>
+  upstream list | remove <name> | sync <name>
+  pack <path|git-url>
   link <team-dir>
   update-check
   help | version
@@ -522,7 +523,7 @@ func cmdUpstream(args []string) int {
 		return 0
 	case "add":
 		if len(args) < 3 {
-			fmt.Fprintln(os.Stderr, "upstream add <name> <path>")
+			fmt.Fprintln(os.Stderr, "upstream add <name> <path|git-url>")
 			return 2
 		}
 		if err := share.AddUpstream(root, args[1], args[2]); err != nil {
@@ -562,7 +563,7 @@ func cmdUpstream(args []string) int {
 
 func cmdPack(args []string) int {
 	if len(args) < 1 {
-		fmt.Fprintln(os.Stderr, "pack <directory>")
+		fmt.Fprintln(os.Stderr, "pack <path|git-url>")
 		return 2
 	}
 	root, code := cwd()
