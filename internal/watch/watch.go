@@ -308,6 +308,9 @@ func writePassHealth(opts Options, summary string, err error) {
 	if rerr != nil {
 		return
 	}
+	if h.StartedAt.IsZero() {
+		h.StartedAt = now
+	}
 	h.LastPoll = now
 	h.LastSummary = firstLine(summary)
 	h.Round++

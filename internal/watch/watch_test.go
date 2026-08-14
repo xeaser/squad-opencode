@@ -209,6 +209,22 @@ func TestFormatHealth(t *testing.T) {
 	}
 }
 
+func TestFormatHealthZero(t *testing.T) {
+	now := time.Date(2026, 8, 14, 14, 32, 0, 0, time.Local)
+	got := FormatHealth(Health{}, now)
+	want := "" +
+		"Ralph watch\n" +
+		"\n" +
+		"PID: n/a\n" +
+		"Last poll: never\n" +
+		"Last: \n" +
+		"Next poll: not scheduled\n" +
+		"Round: 0\n"
+	if got != want {
+		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
+	}
+}
+
 func TestPassWritesHealth(t *testing.T) {
 	root := t.TempDir()
 	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
@@ -234,6 +250,9 @@ func TestPassWritesHealth(t *testing.T) {
 	}
 	if h.Overnight {
 		t.Fatal("not overnight")
+	}
+	if h.StartedAt.IsZero() {
+		t.Fatal("startedAt should be set on first writePassHealth")
 	}
 }
 

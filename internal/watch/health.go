@@ -60,9 +60,19 @@ func ReadHealth(projectRoot string) (Health, error) {
 func FormatHealth(h Health, now time.Time) string {
 	var b strings.Builder
 	b.WriteString("Ralph watch\n\n")
-	fmt.Fprintf(&b, "PID: %d\n", h.PID)
-	fmt.Fprintf(&b, "Uptime: %s\n", formatUptime(now.Sub(h.StartedAt)))
-	fmt.Fprintf(&b, "Last poll: %s\n", formatAgo(now.Sub(h.LastPoll)))
+	if h.PID == 0 {
+		b.WriteString("PID: n/a\n")
+	} else {
+		fmt.Fprintf(&b, "PID: %d\n", h.PID)
+	}
+	if !h.StartedAt.IsZero() {
+		fmt.Fprintf(&b, "Uptime: %s\n", formatUptime(now.Sub(h.StartedAt)))
+	}
+	if h.LastPoll.IsZero() {
+		b.WriteString("Last poll: never\n")
+	} else {
+		fmt.Fprintf(&b, "Last poll: %s\n", formatAgo(now.Sub(h.LastPoll)))
+	}
 	fmt.Fprintf(&b, "Last: %s\n", firstLine(h.LastSummary))
 	if h.NextPoll.IsZero() {
 		b.WriteString("Next poll: not scheduled\n")
