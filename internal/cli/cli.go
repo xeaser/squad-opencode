@@ -97,7 +97,7 @@ Commands:
   cast --remove <name>
   recast
   run -p <prompt> | --file <path> [--agent name] [--url]
-  watch [--execute] [--interval minutes] [--once] [--url]
+  watch [--execute] [--interval minutes] [--once] [--health] [--url]
       [--overnight-start HH:MM] [--overnight-end HH:MM]
   export [file]
   import <file> [--with-host]
@@ -397,6 +397,7 @@ func cmdRun(args []string) int {
 func cmdWatch(args []string) int {
 	exec := false
 	once := false
+	health := false
 	interval := 10
 	var overnightStart, overnightEnd, apiURL string
 	for i := 0; i < len(args); i++ {
@@ -406,6 +407,8 @@ func cmdWatch(args []string) int {
 			exec = true
 		case a == "--once":
 			once = true
+		case a == "--health":
+			health = true
 		case a == "--interval" && i+1 < len(args):
 			i++
 			n, err := strconv.Atoi(args[i])
@@ -431,6 +434,9 @@ func cmdWatch(args []string) int {
 	root, code := cwd()
 	if code != 0 {
 		return code
+	}
+	if health {
+		return cmdWatchHealth(root)
 	}
 	opts := watch.Options{
 		ProjectRoot:    root,
@@ -459,6 +465,20 @@ func cmdWatch(args []string) int {
 	}
 	fmt.Printf("watch loop every %d min (stop: touch .squad/ralph-stop)\n", interval)
 	return watchLoop(opts)
+}
+
+func cmdWatchHealth(root string) int {
+	h, err := watch.ReadHealth(root)
+	if err != nil {
+		if os.IsNotExist(err) {
+			fmt.Println("no watch status (start: squad-oc watch)")
+			return 1
+		}
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Print(watch.FormatHealth(h, time.Now()))
+	return 0
 }
 
 func ensureAPI(apiURL, root string) (opencodeclient.EnsureResult, int) {
