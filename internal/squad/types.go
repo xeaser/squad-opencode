@@ -35,6 +35,8 @@ type InitOptions struct {
 	Preset             string
 	ProjectDescription string
 	Force              bool
+	// Global writes into GlobalSquadDir() instead of ProjectRoot.
+	Global bool
 }
 
 // InitResult is the outcome of init.
