@@ -47,6 +47,9 @@ Desktop.ini
 .vscode/
 *.log
 
+# Agent session scratch
+.superpowers/
+
 # Beads / Dolt files (added by bd init)
 .dolt/
 *.db

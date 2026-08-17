@@ -4,7 +4,7 @@ Zero to org-shaped team. **squad-oc + OpenCode only.**
 
 You do **not** need GitHub Copilot, Node, the npm `@bradygaster/squad-cli`, or the original Squad Ink shell.
 
-**Time:** about 90 minutes. Sections 1–6 ship today. Section 7 is stubs for later phases.
+**Time:** about 100 minutes. Sections 1–6 and 8 ship today. Section 7 is stubs for later phases.
 
 Modeled on [Tamir's original-Squad workshop](https://github.com/tamirdresher/squad-skills/tree/main/workshop), rewritten for this host. Catalog: [use-cases.md](../use-cases.md). Install detail: [get-started.md](../get-started.md).
 
@@ -16,7 +16,8 @@ Modeled on [Tamir's original-Squad workshop](https://github.com/tamirdresher/squ
 | 4 | [Memory](#4-memory) | 10 min | supported today |
 | 5 | [Org shape](#5-org-shape) | 20 min | supported today |
 | 6 | [Ralph](#6-ralph) | 10 min | supported today |
-| 7 | [What's next](#7-whats-next) | 10 min | later phase (stubs) |
+| 7 | [What's next](#7-whats-next) | 5 min | later phase (stubs) |
+| 8 | [Org MCP](#8-org-mcp) | 10 min | supported today |
 
 ---
 
@@ -410,35 +411,96 @@ If you have no GitHub remote yet, stop after reading the commands — do not fak
 
 ## 7. What's next
 
-**Time:** about 10 minutes. **Stubs.** These commands are **not** in `squad-oc help` today. Do not run them.
+**Time:** about 5 minutes. **Stubs** for phases that are **not** shipped. Do not run the commands in this table.
 
 | Later | Phase | Intent |
 |-------|-------|--------|
-| Org MCP | P1 | Committed `.squad/mcp-config.json` translated into `opencode.json` `mcp` |
 | Marketplace browse + install | P2 | Find a skill without memorizing a git URL (today: `pack` / `upstream`) |
 | Office cast | P3 | `cast --theme office` — display names only; `@lead` stays stable |
 | Named plugins | P4 | `install reflect@acme` instead of a path |
 | Review lockout | P5 | Author must not patch a rejected change; protocol + files, not a kernel lock |
 | Ceremonies | P6 | Design review / retro as files, not vibes |
 
-Workshop sections that will grow later (do not do them this week):
+Org MCP is **section 8** (shipped). Still later:
 
-- **Section 8 — Org MCP** — drop config, apply, ask OpenCode what tools it has
 - **Section 9 — Skills marketplace** — browse and install `reflect`
 - **Office theme (optional 3b)** — hire the Office; `@lead` still works
 - **Independent review** — Tester rejects; someone other than Backend fixes
 - **Ceremonies** — design review before a multi-agent feature
 
-WorkIQ, Outlook COM, and Teams Adaptive Cards are **not** product features. P1 may *mention* Teams/ADO/GitHub as example MCP servers.
+WorkIQ, Outlook COM, and Teams Adaptive Cards are **not** product features. Section 8 may *mention* Teams/ADO/GitHub as example MCP servers.
 
 ### Try it
 
-Read the table. Confirm `squad-oc help` has **no** `mcp`, `marketplace`, or `plugin` command.
+Read the table. Confirm `squad-oc help` lists `mcp apply | list | init` and has **no** `marketplace` or `plugin` command.
 
 ### Success looks like
 
-- [ ] You can name what is later vs what you already ran in sections 1–6
-- [ ] You did not wait on P1–P6 to adopt `init` / `link` / `upstream` / `watch`
+- [ ] You can name what is later vs what you already ran in sections 1–6 and 8
+- [ ] You did not wait on P2–P6 to adopt `init` / `link` / `upstream` / `watch` / `mcp apply`
+
+---
+
+## 8. Org MCP
+
+**Time:** about 10 minutes.
+
+The org authors one file: `.squad/mcp-config.json` (after `link`, that is the **shared** team dir). `squad-oc mcp apply` translates it into `opencode.json` `mcp`. OpenCode reads the host file. `squad-oc` does not start MCP processes.
+
+`init` does not write MCP. `doctor` has a **soft** check: if the org file exists, `opencode.json` must list those server names.
+
+Use `${VAR}` or `{env:VAR}`. Never put `sk-` / `ghp_` literals in the file — apply refuses them.
+
+This workshop uses a **disabled remote stub** so you do not need Teams, ADO, or a GitHub token.
+
+```bash
+# in the platform repo (or a service after link — apply reads the linked team dir)
+cd acme/squad-platform
+squad-oc mcp init
+```
+
+If the file already exists, `mcp init` leaves it. Edit `.squad/mcp-config.json` so it looks like this (comments are allowed):
+
+```json
+{
+  "mcpServers": {
+    "example-remote": {
+      "url": "https://example.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${MCP_TOKEN}"
+      },
+      "enabled": false
+    }
+  }
+}
+```
+
+```bash
+squad-oc mcp apply
+squad-oc mcp list
+squad-oc doctor
+```
+
+`mcp list` prints name / source / enabled / applied — not secret values.
+
+Reload OpenCode if it was already open (the host may cache config). Ask:
+
+```text
+List the MCP tools you have
+```
+
+A disabled stub will not connect. That is success for this section: the name is in `opencode.json` and doctor is green.
+
+### Try it
+
+`mcp init` → edit the disabled stub → `mcp apply` → `mcp list` → `doctor`. Peek at `opencode.json` `mcp`.
+
+### Success looks like
+
+- [ ] `.squad/mcp-config.json` exists in the resolved team dir (platform if linked)
+- [ ] `opencode.json` has `"example-remote"` (or your server name) and still has `"$schema"`
+- [ ] `mcp list` shows `enabled=false` `applied=true` and does not print tokens
+- [ ] `doctor` **MCP apply** is OK (soft check; missing apply is FAIL but exit stays 0 if required checks pass)
 
 ---
 
@@ -456,7 +518,7 @@ Each original ease row is a **squad-oc command** you already ran, a **later** co
 | Extra skills pack | `squad-oc pack` / `upstream add` + `sync` |
 | `squad watch` / Ralph | `squad-oc watch [--execute] [--once] [--label]` |
 | Health of the monitor | `squad-oc watch --health` |
-| Drop-in org MCP (`mcp-config.json`) | later (`mcp apply` in P1) |
+| Drop-in org MCP (`mcp-config.json`) | `squad-oc mcp init` / `apply` / `list` |
 | Marketplace browse + install | later (P2) |
 | Office / themed names | later (`cast --theme office` in P3) |
 | `install name@marketplace` | later (P4) |
@@ -481,7 +543,7 @@ Each original ease row is a **squad-oc command** you already ran, a **later** co
 | `unknown upstream` | `upstream add org <path\|git-url>` then `upstream sync org` |
 | `gh issue list` fails | `gh auth status`; repo must have a GitHub remote |
 | Server probe FAIL only | Soft — start `opencode serve` only if you need `run` / `watch --execute` |
-| Invented `mcp apply` | Not shipped — section 7 |
+| `mcp apply` missing servers | Soft — run `squad-oc mcp apply`; see section 8 |
 
 ---
 
