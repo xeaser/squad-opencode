@@ -14,6 +14,7 @@ import (
 
 	"github.com/xeaser/squad-opencode/internal/doctor"
 	"github.com/xeaser/squad-opencode/internal/githubissues"
+	"github.com/xeaser/squad-opencode/internal/mcpconfig"
 	"github.com/xeaser/squad-opencode/internal/opencodeclient"
 	"github.com/xeaser/squad-opencode/internal/selfupdate"
 	"github.com/xeaser/squad-opencode/internal/share"
@@ -76,6 +77,8 @@ func Execute(args []string) int {
 		return cmdUpdateCheck(rest)
 	case "traces":
 		return cmdTraces(rest)
+	case "mcp":
+		return cmdMCP(rest)
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown command: %s\n\n", cmd)
 		printHelp()
@@ -117,6 +120,7 @@ Commands:
   link --off
   update-check [--json] [--refresh]
   traces [--last N] [--json] [--export file]
+  mcp apply | list | init
   help | version
 
 Team state (.squad/) is never wiped by upgrade.
@@ -913,4 +917,62 @@ func cmdTraces(args []string) int {
 	}
 	fmt.Print(traces.FormatTable(spans))
 	return 0
+}
+
+func cmdMCP(args []string) int {
+	if len(args) < 1 {
+		fmt.Fprintln(os.Stderr, "mcp apply|list|init")
+		return 2
+	}
+	root, code := cwd()
+	if code != 0 {
+		return code
+	}
+	switch args[0] {
+	case "apply":
+		if err := mcpconfig.Apply(root); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		fmt.Println("applied MCP → opencode.json")
+		return 0
+	case "list":
+		items, err := mcpconfig.List(root)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		if len(items) == 0 {
+			fmt.Println("(no MCP servers)")
+			return 0
+		}
+		fmt.Printf("%-16s %-8s %-8s %s\n", "name", "source", "enabled", "applied")
+		for _, it := range items {
+			src := it.Source
+			if src == "" {
+				src = "-"
+			}
+			fmt.Printf("%-16s %-8s %-8t %t\n", it.Name, src, it.Enabled, it.Applied)
+		}
+		return 0
+	case "init":
+		created, path, err := mcpconfig.InitExample(root)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		rel := path
+		if r, err := filepath.Rel(root, path); err == nil {
+			rel = filepath.ToSlash(r)
+		}
+		if !created {
+			fmt.Println(rel, "already exists")
+			return 0
+		}
+		fmt.Println("wrote", rel)
+		return 0
+	default:
+		fmt.Fprintln(os.Stderr, "mcp apply|list|init")
+		return 2
+	}
 }

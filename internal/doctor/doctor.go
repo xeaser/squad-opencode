@@ -7,8 +7,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
+	"github.com/xeaser/squad-opencode/internal/mcpconfig"
 	"github.com/xeaser/squad-opencode/internal/opencodeclient"
 	"github.com/xeaser/squad-opencode/internal/squad"
 )
@@ -111,7 +113,44 @@ func RunChecks(projectRoot string) []Check {
 		Hard:   true,
 	})
 
+	checks = append(checks, mcpApplyCheck(projectRoot))
+
 	return checks
+}
+
+func mcpApplyCheck(projectRoot string) Check {
+	org := mcpconfig.OrgPath(projectRoot)
+	if !fileExists(org) {
+		return Check{
+			Name:   "MCP apply",
+			OK:     true,
+			Detail: "no org MCP file",
+			Hard:   false,
+		}
+	}
+	missing, err := mcpconfig.AppliedMissing(projectRoot)
+	if err != nil {
+		return Check{
+			Name:   "MCP apply",
+			OK:     false,
+			Detail: err.Error() + " — run: squad-oc mcp apply",
+			Hard:   false,
+		}
+	}
+	if len(missing) > 0 {
+		return Check{
+			Name:   "MCP apply",
+			OK:     false,
+			Detail: "opencode.json missing MCP server(s): " + strings.Join(missing, ", ") + " — run: squad-oc mcp apply",
+			Hard:   false,
+		}
+	}
+	return Check{
+		Name:   "MCP apply",
+		OK:     true,
+		Detail: "opencode.json has org MCP servers",
+		Hard:   false,
+	}
 }
 
 // PrintAndExitCode prints checks and returns process exit code.
