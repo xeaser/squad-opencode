@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// Lockout sentences that must appear in rendered Phase 5 host files.
+// Lockout sentences that must appear in coordinator and reviewer host files.
 const (
 	lockoutSpawnSpecialists  = "must spawn specialists for multi-layer work"
 	lockoutNoPatchRejected   = "must not patch rejected specialist output"
@@ -17,7 +17,7 @@ const (
 	lockoutIndependentReview = "run independent review of the last specialist change"
 )
 
-func TestPhase5InitRendersReviewLockout(t *testing.T) {
+func TestInitRendersReviewLockout(t *testing.T) {
 	root := t.TempDir()
 	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root}); err != nil {
 		t.Fatal(err)
@@ -71,7 +71,7 @@ func TestPhase5InitRendersReviewLockout(t *testing.T) {
 	}
 }
 
-func TestPhase5RecastKeepsReviewerLockout(t *testing.T) {
+func TestRecastKeepsReviewerLockout(t *testing.T) {
 	root := t.TempDir()
 	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root}); err != nil {
 		t.Fatal(err)
