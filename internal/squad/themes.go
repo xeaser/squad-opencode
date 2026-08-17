@@ -59,6 +59,16 @@ func HostAgentID(id, theme, origin string) string {
 	return id
 }
 
+// OfficeMentionSlug is the extra @tag stem for a stable role id (lead → michael).
+// Independent of origin. Empty when the id is not in the office map.
+func OfficeMentionSlug(id string) string {
+	name, ok := officeTheme[id]
+	if !ok {
+		return ""
+	}
+	return strings.ToLower(name)
+}
+
 // MentionsPath is .squad/mentions.md under the live squad directory.
 func MentionsPath(projectRoot string) string {
 	return filepath.Join(ResolveDir(projectRoot), "mentions.md")
@@ -124,7 +134,8 @@ func themeNames(theme string) map[string]string {
 }
 
 // ApplyTheme rewrites member display names in team.md and charter titles, then
-// records theme on .squad/config.json. Agent IDs are unchanged.
+// records theme and origin on .squad/config.json. Memory IDs are unchanged.
+// Applied office writes a mention map; none on applied clears origin and the map.
 func ApplyTheme(projectRoot, theme string) error {
 	if !IsInitialized(projectRoot) {
 		return fmt.Errorf("not initialized")
@@ -244,9 +255,41 @@ func setConfigTheme(projectRoot, theme string) error {
 		return fmt.Errorf("not initialized")
 	}
 	if theme == ThemeNone {
+		wasApplied := cfg.ThemeOrigin == ThemeOriginApplied
 		cfg.Theme = ""
-	} else {
-		cfg.Theme = theme
+		if wasApplied {
+			cfg.ThemeOrigin = ""
+		}
+		if err := SaveConfig(projectRoot, *cfg); err != nil {
+			return err
+		}
+		if wasApplied {
+			return ClearMentionMap(projectRoot)
+		}
+		return nil
 	}
-	return SaveConfig(projectRoot, *cfg)
+	cfg.Theme = theme
+	if cfg.ThemeOrigin != ThemeOriginInit {
+		cfg.ThemeOrigin = ThemeOriginApplied
+	}
+	if err := SaveConfig(projectRoot, *cfg); err != nil {
+		return err
+	}
+	if cfg.ThemeOrigin == ThemeOriginApplied {
+		return WriteMentionMap(projectRoot, appliedOfficeMentionRows())
+	}
+	return nil
+}
+
+func appliedOfficeMentionRows() []MentionRow {
+	ids := []string{"lead", "frontend", "backend", "tester"}
+	rows := make([]MentionRow, 0, len(ids))
+	for _, id := range ids {
+		rows = append(rows, MentionRow{
+			Role: roleNameByID[id],
+			Now:  OfficeMentionSlug(id),
+			Was:  id,
+		})
+	}
+	return rows
 }

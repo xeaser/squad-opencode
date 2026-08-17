@@ -220,7 +220,7 @@ Write lasting notes to `+"`"+`.squad/agents/%s/knowledge.md`+"`"+`.
 `, name, role, role, id)
 }
 
-// Recast writes .opencode/agents/<id>.md from the live team. Does not touch squad.md.
+// Recast writes .opencode/agents/<host-id>.md from the live team. Does not touch squad.md.
 func Recast(projectRoot string) (RecastResult, error) {
 	if !IsInitialized(projectRoot) {
 		return RecastResult{}, fmt.Errorf("not initialized")
@@ -233,6 +233,13 @@ func Recast(projectRoot string) (RecastResult, error) {
 	if err := os.MkdirAll(destDir, 0o755); err != nil {
 		return RecastResult{}, err
 	}
+	theme, origin := "", ""
+	if det := Detect(projectRoot); det.Config != nil {
+		theme = det.Config.Theme
+		origin = det.Config.ThemeOrigin
+	}
+	liveIDs := map[string]struct{}{}
+	hostIDs := map[string]struct{}{}
 	var res RecastResult
 	tpl := TemplateFS()
 	for _, m := range members {
@@ -243,14 +250,58 @@ func Recast(projectRoot string) (RecastResult, error) {
 		if err != nil {
 			return res, err
 		}
-		path := filepath.Join(destDir, m.ID+".md")
+		host := HostAgentID(m.ID, theme, origin)
+		path := filepath.Join(destDir, host+".md")
 		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 			return res, err
 		}
 		res.Written++
 		res.IDs = append(res.IDs, m.ID)
+		liveIDs[m.ID] = struct{}{}
+		hostIDs[host] = struct{}{}
+	}
+	if err := pruneStaleHostAgents(destDir, liveIDs, hostIDs); err != nil {
+		return res, err
 	}
 	return res, nil
+}
+
+func pruneStaleHostAgents(destDir string, liveIDs, hostIDs map[string]struct{}) error {
+	protected := map[string]struct{}{
+		"squad":     {},
+		"designer":  {},
+		"liveprobe": {},
+	}
+	keep := map[string]struct{}{}
+	for name := range hostIDs {
+		keep[name] = struct{}{}
+	}
+	for name := range liveIDs {
+		if _, stock := roleNameByID[name]; stock {
+			continue
+		}
+		keep[name] = struct{}{}
+	}
+	for name := range protected {
+		keep[name] = struct{}{}
+	}
+	var candidates []string
+	for id := range roleNameByID {
+		candidates = append(candidates, id)
+		if slug := OfficeMentionSlug(id); slug != "" {
+			candidates = append(candidates, slug)
+		}
+	}
+	for _, name := range candidates {
+		if _, ok := keep[name]; ok {
+			continue
+		}
+		err := os.Remove(filepath.Join(destDir, name+".md"))
+		if err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+	return nil
 }
 
 func agentMarkdown(tpl fs.FS, m TeamMember) (string, error) {
