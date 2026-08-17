@@ -52,30 +52,6 @@ func themeNames(theme string) map[string]string {
 	return roleNameByID
 }
 
-// OfficeMentionSlug is the extra @tag file stem for a stable role id
-// (lead → michael). Empty when the slug would match the id.
-func OfficeMentionSlug(id string) string {
-	name, ok := officeTheme[id]
-	if !ok {
-		return ""
-	}
-	slug := memberID(name)
-	if slug == "" || slug == id {
-		return ""
-	}
-	return slug
-}
-
-func officeMentionSlugs() []string {
-	var out []string
-	for id := range officeTheme {
-		if s := OfficeMentionSlug(id); s != "" {
-			out = append(out, s)
-		}
-	}
-	return out
-}
-
 // ApplyTheme rewrites member display names in team.md and charter titles, then
 // records theme on .squad/config.json. Agent IDs are unchanged.
 func ApplyTheme(projectRoot, theme string) error {
