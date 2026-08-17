@@ -99,7 +99,7 @@ Usage:
   squad-oc <command> [options]
 
 Commands:
-  init [--preset default] [--description <text>] [--global]
+  init [--preset default] [--description <text>] [--global] [--theme office|none]
   upgrade [--dry-run] [--force] [--global] [--self]
   doctor | heartbeat
   status | cast
@@ -146,6 +146,7 @@ func cwd() (string, int) {
 func cmdInit(args []string) int {
 	preset := "default"
 	var description string
+	var theme string
 	interactive := true
 	global := false
 	for i := 0; i < len(args); i++ {
@@ -163,6 +164,12 @@ func cmdInit(args []string) int {
 			i++
 			description = args[i]
 			interactive = false
+		case a == "--theme" && i+1 < len(args):
+			i++
+			theme = args[i]
+		case a == "--theme":
+			fmt.Fprintln(os.Stderr, "init --theme requires office or none")
+			return 2
 		case a == "--global":
 			global = true
 		case a == "--help" || a == "-h":
@@ -182,15 +189,27 @@ func cmdInit(args []string) int {
 	if code != 0 {
 		return code
 	}
+	if theme != "" {
+		norm, err := squad.NormalizeTheme(theme)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 2
+		}
+		theme = norm
+	}
 	if interactive && description == "" {
 		fmt.Print("What are you building? (optional, Enter to skip): ")
 		line, _ := bufio.NewReader(os.Stdin).ReadString('\n')
 		description = strings.TrimSpace(line)
 	}
 	result, err := squad.WriteDefaultPreset(squad.InitOptions{
-		ProjectRoot: root, Preset: preset, ProjectDescription: description, Global: global,
+		ProjectRoot: root, Preset: preset, ProjectDescription: description, Global: global, Theme: theme,
 	})
 	if err != nil {
+		if errors.Is(err, squad.ErrUnknownTheme) {
+			fmt.Fprintln(os.Stderr, err)
+			return 2
+		}
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}

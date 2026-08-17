@@ -359,6 +359,52 @@ func TestCastThemeOfficeAndNone(t *testing.T) {
 	}
 }
 
+func TestInitThemeOfficeAndUnknown(t *testing.T) {
+	root := t.TempDir()
+	prev, _ := os.Getwd()
+	if err := os.Chdir(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(prev) })
+
+	if Execute([]string{"init", "--theme", "parks"}) != 2 {
+		t.Fatal("unknown theme should be 2")
+	}
+	if Execute([]string{"init", "--theme"}) != 2 {
+		t.Fatal("missing theme value should be 2")
+	}
+	if code := Execute([]string{"init", "--theme", "office", "--description", "office-birth"}); code != 0 {
+		t.Fatal("init --theme office")
+	}
+	if _, err := os.Stat(filepath.Join(root, ".squad", "agents", "michael", "charter.md")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".opencode", "agents", "michael.md")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".opencode", "agents", "lead.md")); !os.IsNotExist(err) {
+		t.Fatal("no dual files")
+	}
+	if _, err := os.Stat(filepath.Join(root, ".squad", "mentions.md")); !os.IsNotExist(err) {
+		t.Fatal("birth theme writes no mention map")
+	}
+	team, err := os.ReadFile(filepath.Join(root, ".squad", "team.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(team), "@michael") {
+		t.Fatalf("How to work:\n%s", team)
+	}
+	help := captureStdout(t, func() {
+		if Execute([]string{"help"}) != 0 {
+			t.Fatal("help")
+		}
+	})
+	if !strings.Contains(help, "[--theme office|none]") {
+		t.Fatalf("help missing init --theme: %s", help)
+	}
+}
+
 func TestMCPUnknownAndMissingArgs(t *testing.T) {
 	if Execute([]string{"mcp"}) != 2 {
 		t.Fatal("mcp without subcommand should be 2")

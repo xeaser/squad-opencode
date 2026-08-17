@@ -111,6 +111,36 @@ func TestWriteDefaultPreset(t *testing.T) {
 	}
 }
 
+func TestInitThemeOfficeNativeIDs(t *testing.T) {
+	root := t.TempDir()
+	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root, Theme: ThemeOffice}); err != nil {
+		t.Fatal(err)
+	}
+	cfg := Detect(root).Config
+	if cfg.Theme != ThemeOffice || cfg.ThemeOrigin != ThemeOriginInit {
+		t.Fatalf("%+v", cfg)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".squad", "agents", "michael", "charter.md")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".squad", "agents", "lead")); !os.IsNotExist(err) {
+		t.Fatal("birth office must not keep agents/lead")
+	}
+	if _, err := os.Stat(filepath.Join(root, ".opencode", "agents", "michael.md")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".opencode", "agents", "lead.md")); !os.IsNotExist(err) {
+		t.Fatal("no dual files")
+	}
+	if _, err := os.Stat(MentionsPath(root)); !os.IsNotExist(err) {
+		t.Fatal("birth theme writes no mention map")
+	}
+	team, _ := os.ReadFile(filepath.Join(root, ".squad", "team.md"))
+	if !strings.Contains(string(team), "@michael") {
+		t.Fatal("How to work should document @michael")
+	}
+}
+
 func TestParseTeamMarkdown(t *testing.T) {
 	md := `
 ## Coordinator
