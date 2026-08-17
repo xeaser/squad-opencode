@@ -48,6 +48,8 @@ type InitOptions struct {
 	Force              bool
 	// Global writes into GlobalSquadDir() instead of ProjectRoot.
 	Global bool
+	// Theme is optional (office|none). Office mints native character IDs at birth.
+	Theme string
 }
 
 // InitResult is the outcome of init.
