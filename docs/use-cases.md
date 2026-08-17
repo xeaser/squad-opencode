@@ -64,7 +64,7 @@ Also not product features (workshop may mention them as **example** org MCP serv
 
 ## DX table
 
-Each original-Squad ease row is a **squad-oc command** or **won’t port**.
+Each original-Squad ease row is a **squad-oc command** you already ran, a **later** command, or **won’t port**. Later rows stay later — they are not won’t-port.
 
 | Original ease | Mapping |
 |---------------|---------|
