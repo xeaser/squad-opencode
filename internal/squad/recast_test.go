@@ -96,6 +96,29 @@ func TestRecastBirthUsesStockLeadTemplate(t *testing.T) {
 	if strings.Contains(body, "You are **Michael**") {
 		t.Fatalf("birth recast must not fall back to generic stub:\n%s", body)
 	}
+	if !strings.Contains(body, ".squad/agents/michael/") {
+		t.Fatalf("birth michael.md must point at native agent dir:\n%s", body)
+	}
+	if strings.Contains(body, ".squad/agents/lead/") {
+		t.Fatalf("birth michael.md must not keep stock role path (shadow agents/lead):\n%s", body)
+	}
+	for _, pair := range []struct{ host, role string }{
+		{"jim", "frontend"},
+		{"dwight", "backend"},
+		{"pam", "tester"},
+	} {
+		gotRole, err := os.ReadFile(filepath.Join(root, ".opencode", "agents", pair.host+".md"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		roleBody := string(gotRole)
+		if !strings.Contains(roleBody, ".squad/agents/"+pair.host+"/") {
+			t.Fatalf("birth %s.md must point at native agent dir:\n%s", pair.host, roleBody)
+		}
+		if strings.Contains(roleBody, ".squad/agents/"+pair.role+"/") {
+			t.Fatalf("birth %s.md must not keep stock role path:\n%s", pair.host, roleBody)
+		}
+	}
 }
 
 func TestRecastAppliedKeepsStockLeadPrompt(t *testing.T) {
