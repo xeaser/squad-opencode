@@ -306,3 +306,122 @@ func TestCastRemoveViaCLI(t *testing.T) {
 		t.Fatal("add and remove together should fail")
 	}
 }
+
+func TestMCPUnknownAndMissingArgs(t *testing.T) {
+	if Execute([]string{"mcp"}) != 2 {
+		t.Fatal("mcp without subcommand should be 2")
+	}
+	if Execute([]string{"mcp", "nope"}) != 2 {
+		t.Fatal("unknown mcp subcommand should be 2")
+	}
+}
+
+func TestMCPInitApplyListViaCLI(t *testing.T) {
+	root := t.TempDir()
+	prev, _ := os.Getwd()
+	if err := os.Chdir(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(prev) })
+
+	if code := Execute([]string{"init", "--preset", "default", "--description", "mcp"}); code != 0 {
+		t.Fatal("init")
+	}
+	help := captureStdout(t, func() {
+		if Execute([]string{"help"}) != 0 {
+			t.Fatal("help")
+		}
+	})
+	if !strings.Contains(help, "mcp apply") {
+		t.Fatalf("help missing mcp line: %s", help)
+	}
+	if code := Execute([]string{"mcp", "init"}); code != 0 {
+		t.Fatal("mcp init")
+	}
+	cfg := filepath.Join(root, ".squad", "mcp-config.json")
+	if _, err := os.Stat(cfg); err != nil {
+		t.Fatal(err)
+	}
+	org := []byte(`{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}" }
+    }
+  }
+}`)
+	if err := os.WriteFile(cfg, org, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if code := Execute([]string{"mcp", "apply"}); code != 0 {
+		t.Fatal("mcp apply")
+	}
+	raw, err := os.ReadFile(filepath.Join(root, "opencode.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), `"github"`) || !strings.Contains(string(raw), `"$schema"`) {
+		t.Fatalf("apply result: %s", raw)
+	}
+	if strings.Contains(string(raw), "sk-") || strings.Contains(string(raw), "ghp_") {
+		t.Fatalf("apply wrote a token: %s", raw)
+	}
+	listed := captureStdout(t, func() {
+		if Execute([]string{"mcp", "list"}) != 0 {
+			t.Fatal("mcp list")
+		}
+	})
+	if !strings.Contains(listed, "github") {
+		t.Fatalf("list: %s", listed)
+	}
+	if strings.Contains(listed, "sk-") || strings.Contains(listed, "ghp_") || strings.Contains(listed, "${GITHUB_TOKEN}") {
+		t.Fatalf("list leaked secrets: %s", listed)
+	}
+}
+
+func TestMCPApplyReadsLinkedTeamViaCLI(t *testing.T) {
+	service := t.TempDir()
+	shared := t.TempDir()
+	prev, _ := os.Getwd()
+	t.Cleanup(func() { _ = os.Chdir(prev) })
+
+	if err := os.Chdir(shared); err != nil {
+		t.Fatal(err)
+	}
+	if code := Execute([]string{"init", "--preset", "default", "--description", "shared"}); code != 0 {
+		t.Fatal("init shared")
+	}
+	org := []byte(`{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": { "TOKEN": "${GITHUB_TOKEN}" }
+    }
+  }
+}`)
+	if err := os.WriteFile(filepath.Join(shared, ".squad", "mcp-config.json"), org, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.Chdir(service); err != nil {
+		t.Fatal(err)
+	}
+	if code := Execute([]string{"init", "--preset", "default", "--description", "svc"}); code != 0 {
+		t.Fatal("init service")
+	}
+	if code := Execute([]string{"link", shared}); code != 0 {
+		t.Fatal("link")
+	}
+	if code := Execute([]string{"mcp", "apply"}); code != 0 {
+		t.Fatal("mcp apply")
+	}
+	raw, err := os.ReadFile(filepath.Join(service, "opencode.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), `"github"`) {
+		t.Fatalf("linked apply: %s", raw)
+	}
+}

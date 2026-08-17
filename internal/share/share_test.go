@@ -139,6 +139,114 @@ func TestApplySourceMissing(t *testing.T) {
 	}
 }
 
+func TestPackCopiesMissingMCPConfigOnly(t *testing.T) {
+	root := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	pack := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(pack, ".opencode", "agents"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(pack, ".opencode", "agents", "extra.md"), []byte("extra"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(pack, "mcp-config.json"), []byte(`{"mcpServers":{"from-pack":{"command":"npx","args":["-y","demo"]}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := InstallPack(root, pack); err != nil {
+		t.Fatal(err)
+	}
+	dest := filepath.Join(squad.ResolveDir(root), "mcp-config.json")
+	got, err := os.ReadFile(dest)
+	if err != nil || !strings.Contains(string(got), "from-pack") {
+		t.Fatalf("pack-root mcp not copied: %v %s", err, got)
+	}
+	if err := os.WriteFile(dest, []byte(`{"mcpServers":{"keep":{"command":"npx"}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := InstallPack(root, pack); err != nil {
+		t.Fatal(err)
+	}
+	again, err := os.ReadFile(dest)
+	if err != nil || !strings.Contains(string(again), "keep") || strings.Contains(string(again), "from-pack") {
+		t.Fatalf("existing org MCP overwritten: %s", again)
+	}
+}
+
+func TestPackSquadMCPConfigMissingOnly(t *testing.T) {
+	root := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	pack := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(pack, ".opencode", "agents"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(pack, ".opencode", "agents", "extra.md"), []byte("extra"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(pack, ".squad"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(pack, ".squad", "mcp-config.json"), []byte(`{"mcpServers":{"nested":{"command":"npx"}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := InstallPack(root, pack); err != nil {
+		t.Fatal(err)
+	}
+	dest := filepath.Join(root, ".squad", "mcp-config.json")
+	got, err := os.ReadFile(dest)
+	if err != nil || !strings.Contains(string(got), "nested") {
+		t.Fatalf(".squad mcp-config not copied: %v %s", err, got)
+	}
+	if err := os.WriteFile(dest, []byte(`{"mcpServers":{"local":{"command":"npx"}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := InstallPack(root, pack); err != nil {
+		t.Fatal(err)
+	}
+	again, err := os.ReadFile(dest)
+	if err != nil || !strings.Contains(string(again), "local") {
+		t.Fatalf("existing .squad mcp-config overwritten: %s", again)
+	}
+}
+
+func TestPackRootMCPFollowsLink(t *testing.T) {
+	service := t.TempDir()
+	shared := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: service}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: shared}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Link(service, shared); err != nil {
+		t.Fatal(err)
+	}
+	pack := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(pack, ".opencode", "skills"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(pack, ".opencode", "skills", "x.md"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(pack, "mcp-config.json"), []byte(`{"mcpServers":{"linked":{"command":"npx"}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := InstallPack(service, pack); err != nil {
+		t.Fatal(err)
+	}
+	dest := filepath.Join(squad.ResolveDir(service), "mcp-config.json")
+	got, err := os.ReadFile(dest)
+	if err != nil || !strings.Contains(string(got), "linked") {
+		t.Fatalf("pack-root mcp not in linked team: %v %s", err, got)
+	}
+	if _, err := os.Stat(filepath.Join(service, ".squad", "mcp-config.json")); !os.IsNotExist(err) {
+		t.Fatal("pack-root mcp should not land in the local .squad when linked")
+	}
+}
+
 func TestLink(t *testing.T) {
 	root := t.TempDir()
 	other := t.TempDir()

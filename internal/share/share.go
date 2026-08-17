@@ -203,10 +203,31 @@ func applyLocal(projectRoot, src string) (int, error) {
 		}
 		n += c
 	}
+	c, err := copyPackRootMCP(src, projectRoot)
+	if err != nil {
+		return n, err
+	}
+	n += c
 	if n == 0 {
 		return 0, fmt.Errorf("no .opencode/ or .squad/ content in %s", src)
 	}
 	return n, nil
+}
+
+func copyPackRootMCP(src, projectRoot string) (int, error) {
+	from := filepath.Join(src, "mcp-config.json")
+	st, err := os.Stat(from)
+	if err != nil || st.IsDir() {
+		return 0, nil
+	}
+	dest := filepath.Join(squad.ResolveDir(projectRoot), "mcp-config.json")
+	if _, err := os.Stat(dest); err == nil {
+		return 0, nil
+	}
+	if err := writeFile(from, dest); err != nil {
+		return 0, err
+	}
+	return 1, nil
 }
 
 func isDir(p string) bool {
