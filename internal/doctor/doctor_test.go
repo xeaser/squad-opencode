@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/xeaser/squad-opencode/internal/mcpconfig"
+	"github.com/xeaser/squad-opencode/internal/share"
 	"github.com/xeaser/squad-opencode/internal/squad"
 )
 
@@ -79,6 +80,40 @@ func TestMCPApplySoftFailWhenNotApplied(t *testing.T) {
 	}
 	if c.Hard {
 		t.Fatal("MCP apply must stay soft")
+	}
+}
+
+func TestMarketplaceSoftFailWhenUnresolved(t *testing.T) {
+	root := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	c := findCheck(t, RunChecks(root), "Marketplaces")
+	if !c.OK || c.Hard {
+		t.Fatalf("no marketplaces should be soft ok: %+v", c)
+	}
+
+	if err := share.AddMarketplace(root, "missing", filepath.Join(root, "no-such-pack")); err != nil {
+		t.Fatal(err)
+	}
+	c = findCheck(t, RunChecks(root), "Marketplaces")
+	if c.OK {
+		t.Fatalf("expected soft fail for unresolved path: %+v", c)
+	}
+	if c.Hard {
+		t.Fatal("marketplaces must be soft (Hard: false)")
+	}
+
+	pack := t.TempDir()
+	if err := share.AddMarketplace(root, "missing", pack); err != nil {
+		t.Fatal(err)
+	}
+	c = findCheck(t, RunChecks(root), "Marketplaces")
+	if !c.OK {
+		t.Fatalf("expected ok after path exists: %+v", c)
+	}
+	if c.Hard {
+		t.Fatal("marketplaces must stay soft")
 	}
 }
 

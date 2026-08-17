@@ -250,6 +250,7 @@ var skipSquad = map[string]bool{
 	"decisions-archive.md": true,
 	"config.json":          true,
 	"upstreams.json":       true,
+	"marketplaces.json":    true,
 }
 
 func copySquadSnippets(src, dest string) (int, error) {
