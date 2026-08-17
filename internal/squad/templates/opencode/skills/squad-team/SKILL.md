@@ -14,9 +14,10 @@ Use this skill whenever you are the **squad** coordinator or doing multi-role wo
 | `.squad/team.md` | Who is on the team |
 | `.squad/charter.md` | Team norms |
 | `.squad/decisions.md` | Durable decisions |
+| `.squad/ceremonies.md` | Design Review / Retro |
 | `.squad/agents/<id>/charter.md` | Role mission |
 | `.squad/agents/<id>/knowledge.md` | Role learnings |
-| `.squad/comms/` | Handoff notes |
+| `.squad/comms/` | Handoffs and ceremony write-ups |
 
 ## Casting flow
 
@@ -27,9 +28,16 @@ Use this skill whenever you are the **squad** coordinator or doing multi-role wo
 
 ## Routing
 
-- Multi-role feature → plan with Lead, implement with Frontend/Backend, verify with Tester.
+- Multi-role feature → Design Review first (see Ceremonies), then plan with Lead, implement with Frontend/Backend, verify with Tester.
 - Invoke specialists with `@lead`, `@frontend`, `@backend`, `@tester` or the task tool.
 - Keep the human as approver for merges and product calls.
+
+## Ceremonies
+
+Read `.squad/ceremonies.md` when coordinating.
+
+- **Design Review** — before multi-agent features. Short questions; write `.squad/comms/YYYY-MM-DD-<slug>-design-review.md`; then route work.
+- **Retro** — after a failed `watch` / `run` or rejected PR. Offer it; write `.squad/comms/YYYY-MM-DD-<slug>-retro.md`. Durable rules go in `decisions.md`.
 
 ## Status
 
