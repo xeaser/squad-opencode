@@ -319,9 +319,14 @@ func stockRoleID(id string) string {
 }
 
 func agentMarkdown(tpl fs.FS, m TeamMember) (string, error) {
-	data, err := fs.ReadFile(tpl, "opencode/agents/"+stockRoleID(m.ID)+".md")
+	role := stockRoleID(m.ID)
+	data, err := fs.ReadFile(tpl, "opencode/agents/"+role+".md")
 	if err == nil {
-		return string(data), nil
+		body := string(data)
+		if role != m.ID {
+			body = strings.ReplaceAll(body, ".squad/agents/"+role+"/", ".squad/agents/"+m.ID+"/")
+		}
+		return body, nil
 	}
 	return fmt.Sprintf(`---
 description: %s — %s
