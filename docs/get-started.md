@@ -159,7 +159,7 @@ The script builds `squad-oc.exe`, inits `D:\xAI\squad-oc-dummy` if needed, start
 
 ## Also useful
 
-- [90-minute workshop](workshop/README.md) — adopt path for squad-oc + OpenCode only
+- [Workshop](workshop/README.md) — adopt path for squad-oc + OpenCode only (includes org MCP)
 - [Use-case catalog](use-cases.md) — workshop mapped to supported / later / won’t port
 - `squad-oc init --global` (and `upgrade --global`) for a personal team outside the repo
 - `squad-oc cast --add Designer --role Design` then OpenCode sees `@designer` after recast
@@ -171,6 +171,7 @@ The script builds `squad-oc.exe`, inits `D:\xAI\squad-oc-dummy` if needed, start
 - `squad-oc traces` lists local run/watch spans (`--export` writes OTLP JSON)
 - `squad-oc run -p "…"` starts `opencode serve` on `127.0.0.1:4096` if nothing is there; a custom `--url` never auto-starts
 - `squad-oc pack <path|git-url>` or `squad-oc upstream add <name> <path|git-url>` to pull extra agents/skills (see README)
+- `squad-oc mcp init` / `apply` / `list` — org `.squad/mcp-config.json` into `opencode.json` (workshop §8)
 
 `export`/`import`, `nap`, `scrub-emails`, and the rest are in `squad-oc help` and the README.
 
