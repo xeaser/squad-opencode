@@ -173,6 +173,75 @@ func sameIDs(got, want []string) bool {
 	return true
 }
 
+func TestApplyThemeNoneAfterInitOrigin(t *testing.T) {
+	root := t.TempDir()
+	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root, Theme: ThemeOffice}); err != nil {
+		t.Fatal(err)
+	}
+	if err := AddMember(root, "Designer", "Design"); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := ApplyTheme(root, "none"); err != nil {
+		t.Fatal(err)
+	}
+	cfg := Detect(root).Config
+	if cfg.Theme != "" || cfg.ThemeOrigin != "" {
+		t.Fatalf("none after init must clear theme and origin: %+v", cfg)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".squad", "agents", "lead", "charter.md")); err != nil {
+		t.Fatal("must rename agents/michael back to lead")
+	}
+	if _, err := os.Stat(filepath.Join(root, ".squad", "agents", "michael")); !os.IsNotExist(err) {
+		t.Fatal("birth none must not keep agents/michael")
+	}
+	if _, err := os.Stat(MentionsPath(root)); !os.IsNotExist(err) {
+		t.Fatal("mentions.md must stay gone")
+	}
+	team, err := os.ReadFile(filepath.Join(root, ".squad", "team.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(team)
+	if !strings.Contains(body, "| Lead | Lead |") || strings.Contains(body, "| Michael | Lead |") {
+		t.Fatalf("names:\n%s", body)
+	}
+	if !strings.Contains(body, ".squad/agents/lead/") || strings.Contains(body, ".squad/agents/michael/") {
+		t.Fatalf("charter paths:\n%s", body)
+	}
+	if !strings.Contains(body, "@lead") || strings.Contains(body, "@michael") {
+		t.Fatalf("How to work:\n%s", body)
+	}
+	lead, err := os.ReadFile(filepath.Join(root, ".squad", "agents", "lead", "charter.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(string(lead), "# Lead\n") {
+		t.Fatalf("charter title:\n%s", lead)
+	}
+	if strings.Contains(string(lead), ".squad/agents/michael/") {
+		t.Fatalf("charter still points at michael:\n%s", lead)
+	}
+
+	res, err := Recast(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !sameIDs(res.IDs, []string{"lead", "frontend", "backend", "tester", "designer"}) {
+		t.Fatalf("recast ids %v", res.IDs)
+	}
+	agents := filepath.Join(root, ".opencode", "agents")
+	if _, err := os.Stat(filepath.Join(agents, "lead.md")); err != nil {
+		t.Fatal("lead.md must exist after none")
+	}
+	if _, err := os.Stat(filepath.Join(agents, "michael.md")); !os.IsNotExist(err) {
+		t.Fatal("michael.md must be gone")
+	}
+	if _, err := os.Stat(filepath.Join(agents, "designer.md")); err != nil {
+		t.Fatal("designer.md must remain")
+	}
+}
+
 func TestApplyThemeOfficePreservesInitOrigin(t *testing.T) {
 	root := t.TempDir()
 	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root}); err != nil {

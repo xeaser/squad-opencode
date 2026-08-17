@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/xeaser/squad-opencode/internal/squad"
 	"github.com/xeaser/squad-opencode/internal/traces"
 )
 
@@ -356,6 +357,45 @@ func TestCastThemeOfficeAndNone(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(root, ".opencode", "agents", "michael.md")); !os.IsNotExist(err) {
 		t.Fatal("michael.md must be gone after none")
+	}
+}
+
+func TestCastThemeNoneAfterInitOffice(t *testing.T) {
+	root := t.TempDir()
+	prev, _ := os.Getwd()
+	if err := os.Chdir(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(prev) })
+
+	if code := Execute([]string{"init", "--theme", "office", "--description", "birth-none"}); code != 0 {
+		t.Fatal("init --theme office")
+	}
+	if code := Execute([]string{"cast", "--theme", "none"}); code != 0 {
+		t.Fatal("theme none after init")
+	}
+	if _, err := os.Stat(filepath.Join(root, ".squad", "agents", "lead", "charter.md")); err != nil {
+		t.Fatal("memory id must be lead again")
+	}
+	if _, err := os.Stat(filepath.Join(root, ".squad", "agents", "michael")); !os.IsNotExist(err) {
+		t.Fatal("agents/michael must be gone")
+	}
+	if _, err := os.Stat(filepath.Join(root, ".opencode", "agents", "lead.md")); err != nil {
+		t.Fatal("lead.md must exist")
+	}
+	if _, err := os.Stat(filepath.Join(root, ".opencode", "agents", "michael.md")); !os.IsNotExist(err) {
+		t.Fatal("michael.md must be gone")
+	}
+	cfg := squad.Detect(root).Config
+	if cfg.Theme != "" || cfg.ThemeOrigin != "" {
+		t.Fatalf("%+v", cfg)
+	}
+	team, err := os.ReadFile(filepath.Join(root, ".squad", "team.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(team), "@lead") || strings.Contains(string(team), "@michael") {
+		t.Fatalf("How to work:\n%s", team)
 	}
 }
 

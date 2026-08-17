@@ -134,8 +134,9 @@ func themeNames(theme string) map[string]string {
 }
 
 // ApplyTheme rewrites member display names in team.md and charter titles, then
-// records theme and origin on .squad/config.json. Memory IDs are unchanged.
-// Applied office writes a mention map; none on applied clears origin and the map.
+// records theme and origin on .squad/config.json. Memory IDs stay put on later
+// apply. None after init origin is a real rename back to role slugs.
+// Applied office writes a mention map; none clears origin and the map.
 func ApplyTheme(projectRoot, theme string) error {
 	if !IsInitialized(projectRoot) {
 		return fmt.Errorf("not initialized")
@@ -144,6 +145,15 @@ func ApplyTheme(projectRoot, theme string) error {
 	if err != nil {
 		return err
 	}
+	if norm == ThemeNone {
+		if det := Detect(projectRoot); det.Config != nil && det.Config.ThemeOrigin == ThemeOriginInit {
+			if err := restoreOfficeNativeIDs(projectRoot); err != nil {
+				return err
+			}
+			return setConfigTheme(projectRoot, norm)
+		}
+	}
+
 	names := themeNames(norm)
 	teamFile := filepath.Join(ResolveDir(projectRoot), "team.md")
 	raw, err := os.ReadFile(teamFile)
@@ -260,18 +270,12 @@ func setConfigTheme(projectRoot, theme string) error {
 		return fmt.Errorf("not initialized")
 	}
 	if theme == ThemeNone {
-		wasApplied := cfg.ThemeOrigin == ThemeOriginApplied
 		cfg.Theme = ""
-		if wasApplied {
-			cfg.ThemeOrigin = ""
-		}
+		cfg.ThemeOrigin = ""
 		if err := SaveConfig(projectRoot, *cfg); err != nil {
 			return err
 		}
-		if wasApplied {
-			return ClearMentionMap(projectRoot)
-		}
-		return nil
+		return ClearMentionMap(projectRoot)
 	}
 	cfg.Theme = theme
 	if cfg.ThemeOrigin != ThemeOriginInit {

@@ -249,17 +249,18 @@ Memory ids stay `lead` / `frontend` / `backend` / `tester`. Host mention files d
 | Tester | Pam | `@pam` | `@tester` |
 | Coordinator | Squad (not a character) | `@squad` | `@squad` |
 
-Restore role names and `@lead` files by **id** (later-apply only):
+Restore with `--theme none`:
 
 ```bash
 squad-oc cast --theme none
 ```
 
-That clears the mention map and puts `lead.md` back.
+- After **later apply**: display names and `@lead` host files come back; the mention map is dropped. Memory ids were always `lead`/….
+- After **birth** (`init --theme office`): this is a real rename. Memory dirs go back to `lead`/`frontend`/…, host files become `lead.md` again, and there is still no mention map.
 
 ### Try it
 
-**Birth:** `init --theme office`, then `status`. Confirm `.opencode/agents/michael.md` exists, `lead.md` does not, and there is no `.squad/mentions.md`.
+**Birth:** `init --theme office`, then `status`. Confirm `.opencode/agents/michael.md` exists, `lead.md` does not, and there is no `.squad/mentions.md`. Restore with `--theme none` and confirm `agents/lead/` and `lead.md` are back.
 
 **Later apply:** in a default project, `cast --theme office`, then `status`. Confirm `michael.md` yes, `lead.md` no, `.squad/mentions.md` yes. Restore with `--theme none`.
 
@@ -268,7 +269,8 @@ That clears the mention map and puts `lead.md` back.
 - [ ] Birth: status shows Michael / Jim / Dwight / Pam; only `@michael` (no mentions.md, no `lead.md`)
 - [ ] Later apply: mention map present; `@lead` gone; `@michael` works
 - [ ] Never both `lead.md` and `michael.md`
-- [ ] `--theme none` (later apply) brings back Lead / Frontend / Backend / Tester and `@lead`
+- [ ] `--theme none` after later apply brings back Lead / Frontend / Backend / Tester and `@lead`
+- [ ] `--theme none` after birth renames memory ids back to `lead`/… and restores `@lead`
 
 ---
 
