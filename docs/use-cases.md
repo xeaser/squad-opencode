@@ -20,6 +20,9 @@ Host is **OpenCode**. You do **not** need Copilot, Node, or the original Squad C
 | [6. Ralph](workshop/README.md#6-ralph) | One labeled issue | `watch --execute --once --label`, `watch --health` | **supported today** |
 | [7. What's next](workshop/README.md#7-whats-next) | Read remaining stubs | — | **later phase** |
 | [8. Org MCP](workshop/README.md#8-org-mcp) | Org file → `opencode.json` `mcp` | `mcp init`, `mcp apply`, `mcp list` | **supported today** |
+| [9. Skills marketplace](workshop/README.md#9-skills-marketplace) | Browse + install `reflect` | `marketplace add` / `browse` / `install` | **supported today** |
+| [10. Independent review](workshop/README.md#10-independent-review) | Tester rejects; author ≠ fix owner | handoff Review block; `/squad-review` | **supported today** |
+| [11. Ceremonies](workshop/README.md#11-ceremonies) | Design review / retro files | `.squad/ceremonies.md` | **supported today** |
 
 Section 7 is documentation only. `squad-oc help` lists `mcp apply | list | init`. It has no `marketplace` or `plugin` command until those phases land.
 
@@ -32,17 +35,17 @@ Do not treat these as shipped. Spec: [2026-08-14-org-dx-roadmap.md](superpowers/
 | Phase | Original ease | Planned squad-oc | Workshop add-on |
 |-------|---------------|------------------|-----------------|
 | P1 | Drop-in org MCP (`mcp-config.json`) | **shipped** — `mcp init` / `mcp apply` / `mcp list` | [Section 8](workshop/README.md#8-org-mcp) |
-| P2 | Marketplace browse + install | `marketplace add` / `browse` / `install` | Section 9 — Skills marketplace |
+| P2 | Marketplace browse + install | **shipped** — `marketplace add` / `browse` / `install` | [Section 9](workshop/README.md#9-skills-marketplace) |
 | P3 | Themed cast (Office first) | `cast --theme office` (ids stay `@lead`) | Optional 3b — Hire the Office |
 | P4 | Named plugins (`name@marketplace`) | `plugin install reflect@acme` | Update section 9 |
-| P5 | Coordinator spawn + independent review | templates + handoff **Review** block | Tester rejects; author ≠ fix owner |
-| P6 | Ceremonies as files | `.squad/ceremonies.md` at `init` | Design review / retro in chat |
+| P5 | Coordinator spawn + independent review | **shipped** — templates + handoff **Review** block | [Section 10](workshop/README.md#10-independent-review) |
+| P6 | Ceremonies as files | **shipped** — `.squad/ceremonies.md` at `init` | [Section 11](workshop/README.md#11-ceremonies) |
 
 Today’s stand-ins:
 
 | Need | Use now | Later |
 |------|---------|-------|
-| Extra skills / agents | `squad-oc pack <path\|git-url>` or `upstream add` + `sync` | P2 browse, P4 `name@source` |
+| Extra skills / agents | `marketplace browse` / `install` (or `pack` / `upstream`) | P4 `name@source` |
 | Shared team + decisions | `squad-oc link <team-dir>` | still `link` (`mcp apply` reads the linked team dir) |
 | Memory | `.squad/decisions.md` | still files — not `squad_state` |
 
@@ -94,11 +97,11 @@ Each original-Squad ease row is a **squad-oc command** you already ran, a **late
 | Context / PII hygiene | `nap` / `scrub-emails` |
 | Local spans | `squad-oc traces` |
 | Drop-in `mcp-config.json` | `squad-oc mcp init` / `apply` / `list` |
-| Marketplace browse + install | later — `marketplace browse` / `install` (P2) |
+| Marketplace browse + install | `squad-oc marketplace browse` / `install` |
 | Office / themed names | later — `cast --theme office` (P3) |
 | `install reflect@acme` | later — `plugin install` (P4) |
-| Reviewer lockout (author cannot fix) | later — protocol + files (P5) |
-| Design review / retro ceremonies | later — `ceremonies.md` (P6) |
+| Reviewer lockout (author cannot fix) | protocol + files (handoff Review block) |
+| Design review / retro ceremonies | `.squad/ceremonies.md` |
 | GitHub Copilot CLI / Copilot SDK | **won’t port** |
 | Ink / `squad` interactive shell | **won’t port** |
 | Aspire dashboard | **won’t port** |
@@ -119,7 +122,7 @@ Each original-Squad ease row is a **squad-oc command** you already ran, a **late
 | 5. GitHub Issues routing | Workshop §6 — `watch --label` (no Copilot label bot) |
 | 6. Project board tracking | **later** / not a Phase 0 command |
 | 7. Ralph | Workshop §6 — `watch --execute --once` |
-| 8. Skills marketplace | **later** P2 / P4 — today `pack` / `upstream` |
+| 8. Skills marketplace | Workshop §9 — `marketplace browse` / `install`; named `name@source` later P4 |
 | 9. MCP (Teams, Outlook, …) | Workshop §8 — `mcp apply` (disabled stub; Teams/Outlook are examples only) |
 | 10. `@copilot` coding agent | **won’t port** |
 | 11. Ceremonies, humans, cross-machine | ceremonies **later** P6; `link` is today’s cross-repo team |

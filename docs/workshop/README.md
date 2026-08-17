@@ -18,6 +18,9 @@ Modeled on [Tamir's original-Squad workshop](https://github.com/tamirdresher/squ
 | 6 | [Ralph](#6-ralph) | 10 min | supported today |
 | 7 | [What's next](#7-whats-next) | 5 min | later phase (stubs) |
 | 8 | [Org MCP](#8-org-mcp) | 10 min | supported today |
+| 9 | [Skills marketplace](#9-skills-marketplace) | 10 min | supported today |
+| 10 | [Independent review](#10-independent-review) | 5 min | supported today (protocol) |
+| 11 | [Ceremonies](#11-ceremonies) | 5 min | supported today |
 
 ---
 
@@ -415,29 +418,26 @@ If you have no GitHub remote yet, stop after reading the commands — do not fak
 
 | Later | Phase | Intent |
 |-------|-------|--------|
-| Marketplace browse + install | P2 | Find a skill without memorizing a git URL (today: `pack` / `upstream`) |
 | Office cast | P3 | `cast --theme office` — display names only; `@lead` stays stable |
-| Named plugins | P4 | `install reflect@acme` instead of a path |
-| Review lockout | P5 | Author must not patch a rejected change; protocol + files, not a kernel lock |
-| Ceremonies | P6 | Design review / retro as files, not vibes |
+| Named plugins | P4 | `plugin install reflect@acme` instead of a path |
 
-Org MCP is **section 8** (shipped). Still later:
+Shipped after Phase 0: **§8 Org MCP**, **§9 marketplace**, **§10 independent review** (protocol + files, not a kernel lock), **§11 ceremonies**.
 
-- **Section 9 — Skills marketplace** — browse and install `reflect`
+Still later:
+
 - **Office theme (optional 3b)** — hire the Office; `@lead` still works
-- **Independent review** — Tester rejects; someone other than Backend fixes
-- **Ceremonies** — design review before a multi-agent feature
+- **Named plugins** — `reflect@community` once P4 lands
 
 WorkIQ, Outlook COM, and Teams Adaptive Cards are **not** product features. Section 8 may *mention* Teams/ADO/GitHub as example MCP servers.
 
 ### Try it
 
-Read the table. Confirm `squad-oc help` lists `mcp apply | list | init` and has **no** `marketplace` or `plugin` command.
+Read the table. Confirm `squad-oc help` lists `mcp` and `marketplace` and has **no** `plugin install name@source` yet.
 
 ### Success looks like
 
-- [ ] You can name what is later vs what you already ran in sections 1–6 and 8
-- [ ] You did not wait on P2–P6 to adopt `init` / `link` / `upstream` / `watch` / `mcp apply`
+- [ ] You can name what is later (Office theme, named plugins) vs what you already ran
+- [ ] You did not wait on P3–P4 to adopt `init` / `link` / `upstream` / `watch` / `mcp` / `marketplace`
 
 ---
 
@@ -504,6 +504,101 @@ A disabled stub will not connect. That is success for this section: the name is 
 
 ---
 
+## 9. Skills marketplace
+
+**Time:** about 10 minutes.
+
+Browse a pack without memorizing a git URL, then install one skill into this repo’s `.opencode/skills/`. This does **not** overwrite `team.md` or `decisions.md`.
+
+A tiny offline fixture lives in this repo: `docs/workshop/fixtures/skills-pack/` (`reflect` and `fact-checking`).
+
+```bash
+# from the squad-opencode checkout — or pass an absolute path to the fixture
+squad-oc marketplace add community /path/to/squad-opencode/docs/workshop/fixtures/skills-pack
+squad-oc marketplace browse
+# name                         source      triggers
+# reflect                      community   retrospective, lessons learned
+# fact-checking                community   verify, validate claims
+
+squad-oc marketplace install reflect --from community
+# → .opencode/skills/reflect/SKILL.md
+```
+
+If only one marketplace is registered, `--from` is optional.
+
+In OpenCode as **squad**:
+
+```text
+Use the reflect skill on the last change.
+```
+
+### Try it
+
+Add the fixture pack, `browse`, `install reflect`, confirm `.opencode/skills/reflect/SKILL.md`.
+
+### Success looks like
+
+- [ ] `marketplace browse` lists `reflect` and `fact-checking`
+- [ ] `.opencode/skills/reflect/SKILL.md` exists after install
+- [ ] `.squad/team.md` and `.squad/decisions.md` are unchanged
+
+---
+
+## 10. Independent review
+
+**Time:** about 5 minutes. **Protocol + files**, not a kernel lock. OpenCode will not block the author from editing; the coordinator must not assign the author to apply a reject.
+
+Demo: Tester rejects Backend; Lead (or Frontend) applies the fix.
+
+```text
+Team, add GET /api/usage with tests.
+```
+
+Tester writes `.squad/comms/YYYY-MM-DD-tester-to-lead.md` using the handoff **Review** block:
+
+```text
+Verdict: reject — no auth check
+Author: backend
+Fix owner: lead
+Reasons: usage must require auth (see decisions.md)
+```
+
+Coordinator assigns `@lead`, **not** `@backend`. Optional: `/squad-review`.
+
+### Try it
+
+Have Tester reject a Backend change. Open the handoff file and check **Author ≠ Fix owner**.
+
+### Success looks like
+
+- [ ] Handoff file has Verdict, Author, Fix owner, Reasons
+- [ ] Fix owner is not the author
+- [ ] Coordinator does not patch the rejected diff itself
+
+---
+
+## 11. Ceremonies
+
+**Time:** about 5 minutes.
+
+Fresh `init` writes `.squad/ceremonies.md` (Design Review + Retro only). `upgrade` will not overwrite your edits.
+
+Before a multi-agent feature, ask **squad** to run a Design Review (short questions, then `.squad/comms/…-design-review.md`). After a failed `watch` / `run`, it should **offer** a Retro — not start one unless you want it.
+
+### Try it
+
+```text
+Run a design review for adding billed usage export.
+```
+
+### Success looks like
+
+- [ ] `.squad/ceremonies.md` exists after `init`
+- [ ] A design-review note appears under `.squad/comms/`
+- [ ] You did not get an unsolicited retro
+
+---
+
 ## Original-Squad DX
 
 Each original ease row is a **squad-oc command** you already ran, a **later** command, or **won’t port**. Full map: [use-cases.md](../use-cases.md).
@@ -519,11 +614,11 @@ Each original ease row is a **squad-oc command** you already ran, a **later** co
 | `squad watch` / Ralph | `squad-oc watch [--execute] [--once] [--label]` |
 | Health of the monitor | `squad-oc watch --health` |
 | Drop-in org MCP (`mcp-config.json`) | `squad-oc mcp init` / `apply` / `list` |
-| Marketplace browse + install | later (P2) |
+| Marketplace browse + install | `squad-oc marketplace browse` / `install` |
 | Office / themed names | later (`cast --theme office` in P3) |
 | `install name@marketplace` | later (P4) |
-| Reviewer lockout | later (P5) |
-| Ceremonies as files | later (P6) |
+| Reviewer lockout | protocol + files (`/squad-review`, handoff Review block) |
+| Ceremonies as files | `.squad/ceremonies.md` (design review / retro) |
 | GitHub Copilot CLI / Copilot SDK | **won’t port** |
 | Ink / `squad` shell | **won’t port** (use the OpenCode TUI) |
 | Aspire / .NET dashboard | **won’t port** (`traces` is local OTLP JSON) |
