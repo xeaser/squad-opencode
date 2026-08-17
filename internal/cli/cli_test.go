@@ -359,6 +359,33 @@ func TestCastThemeOfficeAndNone(t *testing.T) {
 	}
 }
 
+func TestRecastListsHostAgentIDs(t *testing.T) {
+	root := t.TempDir()
+	prev, _ := os.Getwd()
+	if err := os.Chdir(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(prev) })
+
+	if code := Execute([]string{"init", "--preset", "default"}); code != 0 {
+		t.Fatal("init")
+	}
+	if code := Execute([]string{"cast", "--theme", "office"}); code != 0 {
+		t.Fatal("theme office")
+	}
+	out := captureStdout(t, func() {
+		if Execute([]string{"recast"}) != 0 {
+			t.Fatal("recast")
+		}
+	})
+	if !strings.Contains(out, ".opencode/agents/michael.md") {
+		t.Fatalf("recast should list host slug:\n%s", out)
+	}
+	if strings.Contains(out, ".opencode/agents/lead.md") {
+		t.Fatalf("recast must not list memory id lead.md:\n%s", out)
+	}
+}
+
 func TestInitThemeOfficeAndUnknown(t *testing.T) {
 	root := t.TempDir()
 	prev, _ := os.Getwd()

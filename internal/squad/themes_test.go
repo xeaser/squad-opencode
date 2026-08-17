@@ -75,6 +75,9 @@ func TestApplyThemeOfficeThenNone(t *testing.T) {
 	if !strings.Contains(string(officeTeam), "| Michael | Lead |") {
 		t.Fatalf("team.md:\n%s", officeTeam)
 	}
+	if !strings.Contains(string(officeTeam), "@michael") || strings.Contains(string(officeTeam), "@lead") {
+		t.Fatalf("How to work should list @michael not @lead:\n%s", officeTeam)
+	}
 	leadCharter, _ := os.ReadFile(filepath.Join(root, ".squad", "agents", "lead", "charter.md"))
 	if !strings.HasPrefix(string(leadCharter), "# Michael\n") {
 		t.Fatalf("charter title:\n%s", leadCharter)
@@ -132,6 +135,9 @@ func TestApplyThemeOfficeThenNone(t *testing.T) {
 	afterTeam, _ := os.ReadFile(teamPath)
 	if string(afterTeam) != string(beforeTeam) {
 		t.Fatalf("team.md not restored\n--- got ---\n%s\n--- want ---\n%s", afterTeam, beforeTeam)
+	}
+	if !strings.Contains(string(afterTeam), "@lead") || strings.Contains(string(afterTeam), "@michael") {
+		t.Fatalf("How to work should restore @lead:\n%s", afterTeam)
 	}
 	afterLead, _ := os.ReadFile(filepath.Join(root, ".squad", "agents", "lead", "charter.md"))
 	if string(afterLead) != string(beforeLead) {
@@ -252,10 +258,13 @@ func TestInitAndUpgradeTemplatesMentionMap(t *testing.T) {
 				t.Fatalf("%s read %s: %v", when, rel, err)
 			}
 			body := string(got)
-			for _, want := range []string{"mentions.md", "Tag now"} {
+			for _, want := range []string{"mentions.md", "Tag now", "team.md"} {
 				if !strings.Contains(body, want) {
 					t.Errorf("%s %s missing %q", when, rel, want)
 				}
+			}
+			if strings.Contains(body, "Otherwise `@lead`") || strings.Contains(body, "`@frontend` / `@backend` / `@tester` / `@lead`") {
+				t.Errorf("%s %s hardcodes @lead fallback", when, rel)
 			}
 		}
 	}

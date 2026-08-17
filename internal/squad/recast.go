@@ -113,7 +113,12 @@ func RemoveMember(projectRoot, name string) error {
 	if err := os.WriteFile(teamFile, []byte(next), 0o644); err != nil {
 		return err
 	}
-	host := filepath.Join(OpencodeAgentsDir(projectRoot), found.ID+".md")
+	theme, origin := "", ""
+	if det := Detect(projectRoot); det.Config != nil {
+		theme = det.Config.Theme
+		origin = det.Config.ThemeOrigin
+	}
+	host := filepath.Join(OpencodeAgentsDir(projectRoot), HostAgentID(found.ID, theme, origin)+".md")
 	if err := os.Remove(host); err != nil && !os.IsNotExist(err) {
 		return err
 	}
@@ -304,8 +309,17 @@ func pruneStaleHostAgents(destDir string, liveIDs, hostIDs map[string]struct{}) 
 	return nil
 }
 
+func stockRoleID(id string) string {
+	for roleID, name := range officeTheme {
+		if memberID(name) == id {
+			return roleID
+		}
+	}
+	return id
+}
+
 func agentMarkdown(tpl fs.FS, m TeamMember) (string, error) {
-	data, err := fs.ReadFile(tpl, "opencode/agents/"+m.ID+".md")
+	data, err := fs.ReadFile(tpl, "opencode/agents/"+stockRoleID(m.ID)+".md")
 	if err == nil {
 		return string(data), nil
 	}

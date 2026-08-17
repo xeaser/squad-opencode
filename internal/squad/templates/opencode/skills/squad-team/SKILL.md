@@ -30,7 +30,7 @@ Use this skill whenever you are the **squad** coordinator or doing multi-role wo
 ## Routing
 
 - Multi-role feature → Design Review first (see Ceremonies), then plan with Lead, implement with Frontend/Backend, verify with Tester.
-- Invoke specialists with current tags. If `.squad/mentions.md` exists, use **Tag now** (not stale `@lead`); treat **Was** as the same specialist. Otherwise `@lead`, `@frontend`, `@backend`, `@tester` or the task tool.
+- Invoke specialists with current tags from `.squad/team.md`, charter stems, or `.opencode/agents/*.md`. If `.squad/mentions.md` exists, use **Tag now**; treat **Was** as the same specialist.
 - Keep the human as approver for merges and product calls.
 
 ## Ceremonies

@@ -56,13 +56,13 @@ OpenCode creates `.opencode/package.json` (`@opencode-ai/plugin`) and runs an in
 
 | Command | Role |
 |---------|------|
-| `init [--preset default] [--description <text>] [--global]` | Scaffold `.squad/` + `.opencode/` (`--global` uses the user config dir) |
+| `init [--preset default] [--description <text>] [--global] [--theme office|none]` | Scaffold `.squad/` + `.opencode/` (`--global` uses the user config dir) |
 | `upgrade [--dry-run] [--force] [--global] [--self]` | Refresh host templates; `--self` replaces this binary from GitHub Releases |
 | `doctor` / `heartbeat` | Health checks |
 | `status` / `cast` | Team table |
 | `cast --add <name> [--role <role>]` | Add a member and regenerate `.opencode/agents` |
 | `cast --remove <name>` | Remove a member and regenerate `.opencode/agents` |
-| `cast --theme office` / `none` | Office display names; ids stay `@lead` |
+| `cast --theme office` / `none` | `init --theme office` (native `@michael`) or later `cast --theme office` (mention map; `@lead` gone) |
 | `recast` | Regenerate `.opencode/agents` from `.squad/team.md` |
 | `run -p <prompt>` / `--file <path> [--agent name] [--url]` | Prompt the OpenCode HTTP API as `squad`; auto-starts `opencode serve` on :4096 only |
 | `watch` / `triage` / `loop` `[--execute] [--interval minutes] [--once] [--health] [--url] [--overnight-start HH:MM] [--overnight-end HH:MM] [--label name] [--log-file path] [--verbose] [--notify-level all\|important\|none] [--state-backend memory\|git-notes\|orphan-branch]` | Issue triage (Ralph); `--execute` uses `run` |

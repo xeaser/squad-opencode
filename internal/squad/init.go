@@ -166,9 +166,8 @@ func rewriteTeamForOfficeBirth(content string) string {
 	for id, name := range officeTheme {
 		native := memberID(name)
 		content = strings.ReplaceAll(content, ".squad/agents/"+id+"/", ".squad/agents/"+native+"/")
-		content = strings.ReplaceAll(content, "@"+id, "@"+native)
 	}
-	return content
+	return rewriteOfficeMentionTags(content)
 }
 
 func rewriteOfficeCharterPaths(root string) error {

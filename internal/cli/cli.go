@@ -366,9 +366,14 @@ func cmdRecast() int {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
+	theme, origin := "", ""
+	if det := squad.Detect(root); det.Config != nil {
+		theme = det.Config.Theme
+		origin = det.Config.ThemeOrigin
+	}
 	fmt.Printf("recast %d agent file(s)\n", res.Written)
 	for _, id := range res.IDs {
-		fmt.Printf("  ~ .opencode/agents/%s.md\n", id)
+		fmt.Printf("  ~ .opencode/agents/%s.md\n", squad.HostAgentID(id, theme, origin))
 	}
 	return 0
 }
