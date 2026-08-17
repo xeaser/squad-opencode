@@ -22,6 +22,11 @@ func TestUpgradeRestoresHostLeavesTeam(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	cerPath := filepath.Join(root, ".squad", "ceremonies.md")
+	customCer := "# Ceremonies\n\nCUSTOM TEAM EDIT\n"
+	if err := os.WriteFile(cerPath, []byte(customCer), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	agent := filepath.Join(root, ".opencode", "agents", "squad.md")
 	if err := os.WriteFile(agent, []byte("MUTATED\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -52,6 +57,13 @@ func TestUpgradeRestoresHostLeavesTeam(t *testing.T) {
 	}
 	if !strings.Contains(string(teamAfter), "Keep me") {
 		t.Fatal("description lost")
+	}
+	gotCer, err := os.ReadFile(cerPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(gotCer) != customCer {
+		t.Fatal("ceremonies.md must not change on upgrade")
 	}
 }
 
@@ -111,11 +123,23 @@ func TestUpgradeDoesNotTouchKnowledge(t *testing.T) {
 	if err := os.WriteFile(know, []byte(custom), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	cerPath := filepath.Join(root, ".squad", "ceremonies.md")
+	customCer := "# Ceremonies\n\nCUSTOM TEAM EDIT\n"
+	if err := os.WriteFile(cerPath, []byte(customCer), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := UpgradeHostFiles(UpgradeOptions{ProjectRoot: root, Force: true}); err != nil {
 		t.Fatal(err)
 	}
 	got, _ := os.ReadFile(know)
 	if string(got) != custom {
 		t.Fatalf("knowledge overwritten:\n%s", got)
+	}
+	gotCer, err := os.ReadFile(cerPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(gotCer) != customCer {
+		t.Fatal("ceremonies.md must not change on upgrade")
 	}
 }

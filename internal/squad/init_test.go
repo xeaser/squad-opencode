@@ -32,6 +32,7 @@ func TestWriteDefaultPreset(t *testing.T) {
 		".squad/team.md",
 		".squad/charter.md",
 		".squad/decisions.md",
+		".squad/ceremonies.md",
 		".squad/agents/lead/charter.md",
 		".squad/agents/frontend/charter.md",
 		".squad/agents/backend/charter.md",
@@ -73,6 +74,19 @@ func TestWriteDefaultPreset(t *testing.T) {
 		t.Errorf("bad config: %+v", cfg)
 	}
 
+	cerPath := filepath.Join(root, ".squad", "ceremonies.md")
+	cer, err := os.ReadFile(cerPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(cer), "Design Review") || !strings.Contains(string(cer), "Retro") {
+		t.Error("ceremonies.md missing Design Review / Retro")
+	}
+	customCer := "# Ceremonies\n\nCUSTOM TEAM EDIT\n"
+	if err := os.WriteFile(cerPath, []byte(customCer), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
 	// idempotent
 	res2, err := WriteDefaultPreset(InitOptions{ProjectRoot: root, Preset: "default"})
 	if err != nil {
@@ -80,6 +94,13 @@ func TestWriteDefaultPreset(t *testing.T) {
 	}
 	if !res2.AlreadyInitialized || len(res2.FilesWritten) != 0 {
 		t.Fatalf("expected idempotent skip, got %+v", res2)
+	}
+	gotCer, err := os.ReadFile(cerPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(gotCer) != customCer {
+		t.Fatal("second init must not overwrite ceremonies.md")
 	}
 	if !IsInitialized(root) {
 		t.Error("expected initialized")
@@ -178,6 +199,11 @@ func TestUpgradeHostFilesGlobal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	cerPath := filepath.Join(root, ".squad", "ceremonies.md")
+	customCer := "# Ceremonies\n\nCUSTOM GLOBAL EDIT\n"
+	if err := os.WriteFile(cerPath, []byte(customCer), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	agent := filepath.Join(root, ".opencode", "agents", "squad.md")
 	if err := os.WriteFile(agent, []byte("MUTATED\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -208,5 +234,12 @@ func TestUpgradeHostFilesGlobal(t *testing.T) {
 	}
 	if !strings.Contains(string(teamAfter), "Keep me") {
 		t.Fatal("description lost")
+	}
+	gotCer, err := os.ReadFile(cerPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(gotCer) != customCer {
+		t.Fatal("ceremonies.md must not change on upgrade")
 	}
 }
