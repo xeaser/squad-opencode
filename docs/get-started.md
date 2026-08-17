@@ -159,6 +159,8 @@ The script builds `squad-oc.exe`, inits `D:\xAI\squad-oc-dummy` if needed, start
 
 ## Also useful
 
+- [90-minute workshop](workshop/README.md) — adopt path for squad-oc + OpenCode only
+- [Use-case catalog](use-cases.md) — workshop mapped to supported / later / won’t port
 - `squad-oc init --global` (and `upgrade --global`) for a personal team outside the repo
 - `squad-oc cast --add Designer --role Design` then OpenCode sees `@designer` after recast
 - `squad-oc cast --remove Tester` drops a member and recasts agents
