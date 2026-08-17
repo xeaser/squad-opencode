@@ -35,6 +35,11 @@ squad-oc run -p "Summarize .squad/team.md"
 
 Full walkthrough: **[docs/get-started.md](docs/get-started.md)**
 
+## Also useful
+
+- **[docs/workshop/README.md](docs/workshop/README.md)** — 90-minute adopt path (squad-oc + OpenCode only)
+- **[docs/use-cases.md](docs/use-cases.md)** — workshop mapped to supported / later / won’t port
+
 ## What to commit
 
 This repo dogfoods Squad on itself. After `init` + opening OpenCode:
