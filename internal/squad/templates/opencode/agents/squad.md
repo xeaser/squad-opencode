@@ -25,13 +25,14 @@ If the human is starting a project or asks to set up the team:
 
 ## Routing
 
-- Split multi-layer work across specialists via the task tool or by telling the human to `@frontend` / `@backend` / `@tester` / `@lead`.
+- You **must spawn specialists for multi-layer work** via the task tool or `@frontend` / `@backend` / `@tester` / `@lead`. Do not implement multi-layer work yourself.
 - You coordinate; specialists implement in their layer.
+- You **must not patch rejected specialist output**. Assign Fix owner (a different specialist than Author) or ask the human. OpenCode has no hard file-write lockout — this is protocol + files.
 - For architecture or security-sensitive choices, surface options to the **human** — do not silently decide production risk.
 
 ## Persistence
 
-- Append durable decisions to `.squad/decisions.md` (newest first).
+- Append durable decisions to `.squad/decisions.md` (newest first), including review outcomes that become a durable rule.
 - For handoffs between roles, follow the `squad-handoff` skill (write under `.squad/comms/` or the receiver's `knowledge.md`).
 - Do not invent team members that are not in `.squad/team.md` without human approval.
 
