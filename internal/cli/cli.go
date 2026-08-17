@@ -79,6 +79,8 @@ func Execute(args []string) int {
 		return cmdTraces(rest)
 	case "mcp":
 		return cmdMCP(rest)
+	case "marketplace":
+		return cmdMarketplace(rest)
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown command: %s\n\n", cmd)
 		printHelp()
@@ -121,6 +123,7 @@ Commands:
   update-check [--json] [--refresh]
   traces [--last N] [--json] [--export file]
   mcp apply | list | init
+  marketplace add <name> <path|git-url> | list | remove <name> | browse [name] | install <plugin> [--from <name>]
   help | version
 
 Team state (.squad/) is never wiped by upgrade.
@@ -975,4 +978,116 @@ func cmdMCP(args []string) int {
 		fmt.Fprintln(os.Stderr, "mcp apply|list|init")
 		return 2
 	}
+}
+
+func cmdMarketplace(args []string) int {
+	if len(args) < 1 {
+		fmt.Fprintln(os.Stderr, "marketplace add|list|remove|browse|install")
+		return 2
+	}
+	root, code := cwd()
+	if code != 0 {
+		return code
+	}
+	switch args[0] {
+	case "list":
+		list, err := share.ListMarketplaces(root)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		if len(list) == 0 {
+			fmt.Println("(no marketplaces)")
+			return 0
+		}
+		for _, m := range list {
+			fmt.Printf("%s\t%s\n", m.Name, m.Path)
+		}
+		return 0
+	case "add":
+		if len(args) < 3 {
+			fmt.Fprintln(os.Stderr, "marketplace add <name> <path|git-url>")
+			return 2
+		}
+		if err := share.AddMarketplace(root, args[1], args[2]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		fmt.Println("added", args[1])
+		return 0
+	case "remove":
+		if len(args) < 2 {
+			fmt.Fprintln(os.Stderr, "marketplace remove <name>")
+			return 2
+		}
+		if err := share.RemoveMarketplace(root, args[1]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		fmt.Println("removed", args[1])
+		return 0
+	case "browse":
+		name := ""
+		if len(args) > 1 {
+			name = args[1]
+		}
+		plugins, err := share.BrowsePlugins(root, name)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		if len(plugins) == 0 {
+			fmt.Println("(no plugins)")
+			return 0
+		}
+		fmt.Printf("%-20s %-36s %s\n", "plugin", "description", "triggers")
+		for _, p := range plugins {
+			fmt.Printf("%-20s %-36s %s\n", p.Name, p.Description, p.Triggers)
+		}
+		return 0
+	case "install":
+		plugin, from, err := parseMarketplaceInstall(args[1:])
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 2
+		}
+		n, err := share.InstallPlugin(root, plugin, from)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		fmt.Printf("installed %s (%d file(s))\n", plugin, n)
+		return 0
+	default:
+		fmt.Fprintln(os.Stderr, "marketplace add|list|remove|browse|install")
+		return 2
+	}
+}
+
+func parseMarketplaceInstall(args []string) (plugin, from string, err error) {
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		switch {
+		case a == "--from" && i+1 < len(args):
+			i++
+			from = args[i]
+		case strings.HasPrefix(a, "--from="):
+			from = strings.TrimPrefix(a, "--from=")
+		case a == "--from":
+			return "", "", fmt.Errorf("marketplace install --from requires a name")
+		case a == "--help" || a == "-h":
+			return "", "", fmt.Errorf("marketplace install <plugin> [--from <name>]")
+		case strings.HasPrefix(a, "-"):
+			return "", "", fmt.Errorf("unknown install flag: %s", a)
+		default:
+			if plugin != "" {
+				return "", "", fmt.Errorf("marketplace install <plugin> [--from <name>]")
+			}
+			plugin = a
+		}
+	}
+	if plugin == "" {
+		return "", "", fmt.Errorf("marketplace install <plugin> [--from <name>]")
+	}
+	return plugin, from, nil
 }

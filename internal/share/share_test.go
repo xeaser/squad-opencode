@@ -3,6 +3,7 @@ package share
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -271,5 +272,184 @@ func TestLink(t *testing.T) {
 	}
 	if squad.Detect(root).Config.LinkPath != "" {
 		t.Fatal("expected unlink")
+	}
+}
+
+func workshopSkillsPack(t *testing.T) string {
+	t.Helper()
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("caller")
+	}
+	p := filepath.Join(filepath.Dir(file), "..", "..", "docs", "workshop", "fixtures", "skills-pack")
+	if !isDir(p) {
+		t.Fatalf("missing fixture pack %s", p)
+	}
+	return p
+}
+
+func TestMarketplaceBrowseAndInstall(t *testing.T) {
+	root := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root, ProjectDescription: "keep-me"}); err != nil {
+		t.Fatal(err)
+	}
+	pack := workshopSkillsPack(t)
+	if err := AddMarketplace(root, "community", pack); err != nil {
+		t.Fatal(err)
+	}
+	list, err := ListMarketplaces(root)
+	if err != nil || len(list) != 1 || list[0].Name != "community" {
+		t.Fatalf("list: %v %v", list, err)
+	}
+
+	plugins, err := BrowsePlugins(root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plugins) != 2 {
+		t.Fatalf("browse want 2 plugins, got %#v", plugins)
+	}
+	byName := map[string]Plugin{}
+	for _, p := range plugins {
+		byName[p.Name] = p
+	}
+	if _, ok := byName["reflect"]; !ok {
+		t.Fatalf("missing reflect: %#v", plugins)
+	}
+	if _, ok := byName["fact-checking"]; !ok {
+		t.Fatalf("missing fact-checking: %#v", plugins)
+	}
+	if !strings.Contains(byName["reflect"].Triggers, "retrospective") {
+		t.Fatalf("reflect triggers: %q", byName["reflect"].Triggers)
+	}
+	named, err := BrowsePlugins(root, "community")
+	if err != nil || len(named) != 2 {
+		t.Fatalf("browse community: %v %#v", err, named)
+	}
+
+	n, err := InstallPlugin(root, "reflect", "")
+	if err != nil || n < 1 {
+		t.Fatalf("install n=%d err=%v", n, err)
+	}
+	skill := filepath.Join(root, ".opencode", "skills", "reflect", "SKILL.md")
+	got, err := os.ReadFile(skill)
+	if err != nil || !strings.Contains(string(got), "retrospective") {
+		t.Fatalf("copied SKILL.md: %v %s", err, got)
+	}
+
+	n2, err := InstallPlugin(root, "reflect", "community")
+	if err != nil {
+		t.Fatalf("second install: %v", err)
+	}
+	again, err := os.ReadFile(skill)
+	if err != nil || string(again) != string(got) {
+		t.Fatalf("idempotent install changed SKILL.md: n=%d %v %s", n2, err, again)
+	}
+
+	team, err := os.ReadFile(filepath.Join(root, ".squad", "team.md"))
+	if err != nil || !strings.Contains(string(team), "keep-me") {
+		t.Fatalf("team.md touched: %v %s", err, team)
+	}
+	decisions := filepath.Join(root, ".squad", "decisions.md")
+	beforeDec, err := os.ReadFile(decisions)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	poison := t.TempDir()
+	if _, err := squad.CopyTree(pack, poison); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(poison, ".squad"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(poison, ".squad", "team.md"), []byte("SHOULD-NOT-WIN"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(poison, ".squad", "decisions.md"), []byte("SHOULD-NOT-WIN"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := AddMarketplace(root, "poison", poison); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := InstallPlugin(root, "fact-checking", "poison"); err != nil {
+		t.Fatal(err)
+	}
+	team, err = os.ReadFile(filepath.Join(root, ".squad", "team.md"))
+	if err != nil || strings.Contains(string(team), "SHOULD-NOT-WIN") || !strings.Contains(string(team), "keep-me") {
+		t.Fatalf("install overwrote team.md: %v %s", err, team)
+	}
+	afterDec, err := os.ReadFile(decisions)
+	if err != nil || string(afterDec) != string(beforeDec) || strings.Contains(string(afterDec), "SHOULD-NOT-WIN") {
+		t.Fatalf("install overwrote decisions.md: %v %s", err, afterDec)
+	}
+
+	if _, err := BrowsePlugins(root, "nope"); err == nil || !strings.Contains(err.Error(), "unknown marketplace") {
+		t.Fatalf("unknown marketplace: %v", err)
+	}
+	if _, err := InstallPlugin(root, "nope", "community"); err == nil || !strings.Contains(err.Error(), "unknown plugin") {
+		t.Fatalf("unknown plugin: %v", err)
+	}
+	if _, err := InstallPlugin(root, "reflect", "missing"); err == nil || !strings.Contains(err.Error(), "unknown marketplace") {
+		t.Fatalf("unknown --from: %v", err)
+	}
+
+	if err := RemoveMarketplace(root, "poison"); err != nil {
+		t.Fatal(err)
+	}
+	list, _ = ListMarketplaces(root)
+	if len(list) != 1 || list[0].Name != "community" {
+		t.Fatal(list)
+	}
+}
+
+func TestMarketplaceGitURLUsesCloneGit(t *testing.T) {
+	root := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	pack := workshopSkillsPack(t)
+	prev := CloneGit
+	var urls []string
+	CloneGit = func(url, dest string) error {
+		urls = append(urls, url)
+		if url != "https://example.com/skills.git" {
+			t.Fatalf("url %s", url)
+		}
+		_, err := squad.CopyTree(pack, dest)
+		return err
+	}
+	t.Cleanup(func() { CloneGit = prev })
+
+	if err := AddMarketplace(root, "community", "https://example.com/skills.git"); err != nil {
+		t.Fatal(err)
+	}
+	plugins, err := BrowsePlugins(root, "community")
+	if err != nil || len(plugins) != 2 {
+		t.Fatalf("browse git: %v %#v", err, plugins)
+	}
+	n, err := InstallPlugin(root, "reflect", "community")
+	if err != nil || n < 1 {
+		t.Fatalf("install git n=%d err=%v", n, err)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".opencode", "skills", "reflect", "SKILL.md")); err != nil {
+		t.Fatal(err)
+	}
+	if len(urls) < 2 {
+		t.Fatalf("CloneGit calls: %v", urls)
+	}
+}
+
+func TestMarketplaceInstallRequiresFromWhenMany(t *testing.T) {
+	root := t.TempDir()
+	pack := workshopSkillsPack(t)
+	if err := AddMarketplace(root, "a", pack); err != nil {
+		t.Fatal(err)
+	}
+	if err := AddMarketplace(root, "b", pack); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := InstallPlugin(root, "reflect", ""); err == nil || !strings.Contains(err.Error(), "--from") {
+		t.Fatalf("expected --from required: %v", err)
 	}
 }

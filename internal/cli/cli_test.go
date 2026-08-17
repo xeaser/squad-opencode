@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -423,5 +424,78 @@ func TestMCPApplyReadsLinkedTeamViaCLI(t *testing.T) {
 	}
 	if !strings.Contains(string(raw), `"github"`) {
 		t.Fatalf("linked apply: %s", raw)
+	}
+}
+
+func TestMarketplaceUnknownAndMissingArgs(t *testing.T) {
+	if Execute([]string{"marketplace"}) != 2 {
+		t.Fatal("marketplace without subcommand should be 2")
+	}
+	if Execute([]string{"marketplace", "nope"}) != 2 {
+		t.Fatal("unknown marketplace subcommand should be 2")
+	}
+	if Execute([]string{"marketplace", "add"}) != 2 {
+		t.Fatal("marketplace add without args should be 2")
+	}
+	if Execute([]string{"marketplace", "install"}) != 2 {
+		t.Fatal("marketplace install without plugin should be 2")
+	}
+}
+
+func TestMarketplaceBrowseInstallViaCLI(t *testing.T) {
+	root := t.TempDir()
+	prev, _ := os.Getwd()
+	if err := os.Chdir(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(prev) })
+
+	if code := Execute([]string{"init", "--preset", "default", "--description", "mkt"}); code != 0 {
+		t.Fatal("init")
+	}
+	help := captureStdout(t, func() {
+		if Execute([]string{"help"}) != 0 {
+			t.Fatal("help")
+		}
+	})
+	if !strings.Contains(help, "marketplace add") {
+		t.Fatalf("help missing marketplace line: %s", help)
+	}
+
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("caller")
+	}
+	pack := filepath.Join(filepath.Dir(thisFile), "..", "..", "docs", "workshop", "fixtures", "skills-pack")
+	if code := Execute([]string{"marketplace", "add", "community", pack}); code != 0 {
+		t.Fatal("add")
+	}
+	listed := captureStdout(t, func() {
+		if Execute([]string{"marketplace", "list"}) != 0 {
+			t.Fatal("list")
+		}
+	})
+	if !strings.Contains(listed, "community") {
+		t.Fatalf("list: %s", listed)
+	}
+	browsed := captureStdout(t, func() {
+		if Execute([]string{"marketplace", "browse"}) != 0 {
+			t.Fatal("browse")
+		}
+	})
+	if !strings.Contains(browsed, "reflect") || !strings.Contains(browsed, "fact-checking") {
+		t.Fatalf("browse: %s", browsed)
+	}
+	if !strings.Contains(browsed, "retrospective") {
+		t.Fatalf("browse missing triggers: %s", browsed)
+	}
+	if code := Execute([]string{"marketplace", "install", "reflect"}); code != 0 {
+		t.Fatal("install")
+	}
+	if _, err := os.Stat(filepath.Join(root, ".opencode", "skills", "reflect", "SKILL.md")); err != nil {
+		t.Fatal(err)
+	}
+	if code := Execute([]string{"marketplace", "install", "reflect", "--from", "community"}); code != 0 {
+		t.Fatal("second install")
 	}
 }

@@ -1,0 +1,16 @@
+{
+  "plugins": [
+    {
+      "name": "reflect",
+      "description": "Run a short retrospective on the last change",
+      "triggers": ["retrospective", "lessons learned"],
+      "path": "plugins/reflect"
+    },
+    {
+      "name": "fact-checking",
+      "description": "Verify claims against sources",
+      "triggers": ["verify", "validate claims"],
+      "path": "plugins/fact-checking"
+    }
+  ]
+}
