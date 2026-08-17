@@ -13,6 +13,7 @@ Modeled on [Tamir's original-Squad workshop](https://github.com/tamirdresher/squ
 | 1 | [Tools](#1-tools) | 10 min | supported today |
 | 2 | [Solo repo](#2-solo-repo) | 15 min | supported today |
 | 3 | [Talk to the team](#3-talk-to-the-team) | 15 min | supported today |
+| 3b | [Hire the Office](#3b-hire-the-office) | 5 min | optional |
 | 4 | [Memory](#4-memory) | 10 min | supported today |
 | 5 | [Org shape](#5-org-shape) | 20 min | supported today |
 | 6 | [Ralph](#6-ralph) | 10 min | supported today |
@@ -203,6 +204,47 @@ Send the `Team, add a usage endpoint…` prompt, then at least one `@backend` / 
 - [ ] Coordinator splits the work instead of implementing every layer itself
 - [ ] `@backend`, `@frontend`, and `@tester` each respond in their layer
 - [ ] `squad-oc status` still shows the same cast
+
+---
+
+## 3b. Hire the Office
+
+**Time:** about 5 minutes. **Optional.** Display names only. Agent IDs stay `lead` / `frontend` / `backend` / `tester` so `@lead` and recast keep working.
+
+```bash
+squad-oc cast --theme office
+squad-oc status
+# Michael  Lead
+# Jim      Frontend
+# Dwight   Backend
+# Pam      Tester
+```
+
+| Role | Office name |
+|------|-------------|
+| Lead | Michael |
+| Frontend | Jim |
+| Backend | Dwight |
+| Tester | Pam |
+| Coordinator | Squad (not a character) |
+
+Chat still works either way: `@lead` or “Michael, review the API”.
+
+Restore role names by **id**:
+
+```bash
+squad-oc cast --theme none
+```
+
+### Try it
+
+`cast --theme office`, then `status`. Confirm `.opencode/agents/lead.md` still exists. Restore with `--theme none`.
+
+### Success looks like
+
+- [ ] Status shows Michael / Jim / Dwight / Pam
+- [ ] `@lead` still addresses the coordinator’s lead agent
+- [ ] `--theme none` brings back Lead / Frontend / Backend / Tester
 
 ---
 
@@ -418,15 +460,13 @@ If you have no GitHub remote yet, stop after reading the commands — do not fak
 
 | Later | Phase | Intent |
 |-------|-------|--------|
-| Office cast | P3 | `cast --theme office` — display names only; `@lead` stays stable |
 | Named plugins | P4 | `plugin install reflect@acme` instead of a path |
 
 Shipped after Phase 0: **§8 Org MCP**, **§9 marketplace**, **§10 independent review** (protocol + files, not a kernel lock), **§11 ceremonies**.
 
 Still later:
 
-- **Office theme (optional 3b)** — hire the Office; `@lead` still works
-- **Named plugins** — `reflect@community` once P4 lands
+- **Named plugins** — `plugin install reflect@community` once P4 lands
 
 WorkIQ, Outlook COM, and Teams Adaptive Cards are **not** product features. Section 8 may *mention* Teams/ADO/GitHub as example MCP servers.
 
@@ -615,7 +655,7 @@ Each original ease row is a **squad-oc command** you already ran, a **later** co
 | Health of the monitor | `squad-oc watch --health` |
 | Drop-in org MCP (`mcp-config.json`) | `squad-oc mcp init` / `apply` / `list` |
 | Marketplace browse + install | `squad-oc marketplace browse` / `install` |
-| Office / themed names | later (`cast --theme office` in P3) |
+| Office / themed names | `squad-oc cast --theme office` (ids stay `@lead`) |
 | `install name@marketplace` | later (P4) |
 | Reviewer lockout | protocol + files (`/squad-review`, handoff Review block) |
 | Ceremonies as files | `.squad/ceremonies.md` (design review / retro) |
