@@ -103,6 +103,7 @@ Commands:
   status | cast
   cast --add <name> [--role <role>]
   cast --remove <name>
+  cast --theme office|none
   recast
   run -p <prompt> | --file <path> [--agent name] [--url]
   watch | triage | loop [--execute] [--interval minutes] [--once] [--health] [--url]
@@ -236,7 +237,7 @@ func cmdStatus() int {
 }
 
 func cmdCast(args []string) int {
-	var add, role, remove string
+	var add, role, remove, theme string
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch {
@@ -249,6 +250,12 @@ func cmdCast(args []string) int {
 		case a == "--role" && i+1 < len(args):
 			i++
 			role = args[i]
+		case a == "--theme" && i+1 < len(args):
+			i++
+			theme = args[i]
+		case a == "--theme":
+			fmt.Fprintln(os.Stderr, "cast --theme requires office or none")
+			return 2
 		case a == "--help" || a == "-h":
 			printHelp()
 			return 0
@@ -257,9 +264,16 @@ func cmdCast(args []string) int {
 			return 2
 		}
 	}
+	if theme != "" && (add != "" || remove != "") {
+		fmt.Fprintln(os.Stderr, "cast: use --theme alone")
+		return 2
+	}
 	if add != "" && remove != "" {
 		fmt.Fprintln(os.Stderr, "cast: use --add or --remove, not both")
 		return 2
+	}
+	if theme != "" {
+		return cmdCastTheme(theme)
 	}
 	if add == "" && remove == "" {
 		return cmdStatus()
@@ -291,6 +305,32 @@ func cmdCast(args []string) int {
 		return 1
 	}
 	fmt.Printf("added %s; recast %d agent file(s)\n", add, res.Written)
+	return 0
+}
+
+func cmdCastTheme(theme string) int {
+	if _, err := squad.NormalizeTheme(theme); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 2
+	}
+	root, code := cwd()
+	if code != 0 {
+		return code
+	}
+	if err := squad.ApplyTheme(root, theme); err != nil {
+		if errors.Is(err, squad.ErrUnknownTheme) {
+			fmt.Fprintln(os.Stderr, err)
+			return 2
+		}
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	res, err := squad.Recast(root)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("theme %s; recast %d agent file(s)\n", strings.ToLower(theme), res.Written)
 	return 0
 }
 

@@ -10,6 +10,8 @@ type Config struct {
 	ExternalPath string `json:"externalPath,omitempty"`
 	// LinkPath, if set, is a remote/shared team directory (link).
 	LinkPath string `json:"linkPath,omitempty"`
+	// Theme is an optional display-name theme (e.g. "office"). IDs stay stable.
+	Theme string `json:"theme,omitempty"`
 }
 
 // TeamMember is a parsed row from .squad/team.md.

@@ -308,6 +308,51 @@ func TestCastRemoveViaCLI(t *testing.T) {
 	}
 }
 
+func TestCastThemeOfficeAndNone(t *testing.T) {
+	root := t.TempDir()
+	prev, _ := os.Getwd()
+	if err := os.Chdir(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(prev) })
+
+	if code := Execute([]string{"init", "--preset", "default", "--description", "theme"}); code != 0 {
+		t.Fatal("init")
+	}
+	if Execute([]string{"cast", "--theme", "parks"}) != 2 {
+		t.Fatal("unknown theme should be 2")
+	}
+	if Execute([]string{"cast", "--theme"}) != 2 {
+		t.Fatal("missing theme value should be 2")
+	}
+	if code := Execute([]string{"cast", "--theme", "office"}); code != 0 {
+		t.Fatal("theme office")
+	}
+	team, err := os.ReadFile(filepath.Join(root, ".squad", "team.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(team), "| Michael | Lead |") {
+		t.Fatalf("office names:\n%s", team)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".opencode", "agents", "lead.md")); err != nil {
+		t.Fatal("lead.md must remain")
+	}
+	if _, err := os.Stat(filepath.Join(root, ".opencode", "agents", "michael.md")); !os.IsNotExist(err) {
+		t.Fatal("must not write michael.md")
+	}
+	if code := Execute([]string{"cast", "--theme", "none"}); code != 0 {
+		t.Fatal("theme none")
+	}
+	restored, err := os.ReadFile(filepath.Join(root, ".squad", "team.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(restored), "| Lead | Lead |") || strings.Contains(string(restored), "| Michael | Lead |") {
+		t.Fatalf("restored names:\n%s", restored)
+	}
+}
+
 func TestMCPUnknownAndMissingArgs(t *testing.T) {
 	if Execute([]string{"mcp"}) != 2 {
 		t.Fatal("mcp without subcommand should be 2")

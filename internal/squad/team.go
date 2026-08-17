@@ -59,7 +59,7 @@ func ParseTeamMarkdown(content string) []TeamMember {
 		} else if len(cells) >= 3 {
 			status = cells[len(cells)-1]
 		}
-		id := strings.ToLower(strings.ReplaceAll(name, " ", "-"))
+		id := memberIDFromRow(name, cells)
 		members = append(members, TeamMember{
 			ID:     id,
 			Name:   name,
@@ -68,6 +68,34 @@ func ParseTeamMarkdown(content string) []TeamMember {
 		})
 	}
 	return members
+}
+
+// memberIDFromRow prefers the charter path (`.squad/agents/<id>/…`) so display
+// names can change without renaming @lead / recast files.
+func memberIDFromRow(name string, cells []string) string {
+	if len(cells) >= 3 {
+		if id := idFromCharter(cells[2]); id != "" {
+			return id
+		}
+	}
+	return memberID(name)
+}
+
+func idFromCharter(cell string) string {
+	s := strings.Trim(cell, "`")
+	s = strings.ReplaceAll(s, "\\", "/")
+	const marker = "agents/"
+	i := strings.Index(s, marker)
+	if i < 0 {
+		return ""
+	}
+	rest := s[i+len(marker):]
+	id, _, _ := strings.Cut(rest, "/")
+	id = strings.ToLower(strings.TrimSpace(id))
+	if id == "" || id == "squad" {
+		return ""
+	}
+	return id
 }
 
 func splitTableCells(line string) []string {
