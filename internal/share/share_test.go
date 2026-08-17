@@ -387,11 +387,11 @@ func TestMarketplaceBrowseAndInstall(t *testing.T) {
 	if _, err := BrowsePlugins(root, "nope"); err == nil || !strings.Contains(err.Error(), "unknown marketplace") {
 		t.Fatalf("unknown marketplace: %v", err)
 	}
-	if _, err := InstallPlugin(root, "nope", "community"); err == nil || !strings.Contains(err.Error(), "unknown plugin") {
-		t.Fatalf("unknown plugin: %v", err)
+	if _, err := InstallPlugin(root, "nope", "community"); err == nil || !strings.Contains(err.Error(), "missing plugin") {
+		t.Fatalf("missing plugin: %v", err)
 	}
-	if _, err := InstallPlugin(root, "reflect", "missing"); err == nil || !strings.Contains(err.Error(), "unknown marketplace") {
-		t.Fatalf("unknown --from: %v", err)
+	if _, err := InstallPlugin(root, "reflect", "missing"); err == nil || !strings.Contains(err.Error(), "missing marketplace") {
+		t.Fatalf("missing marketplace: %v", err)
 	}
 
 	if err := RemoveMarketplace(root, "poison"); err != nil {
@@ -451,5 +451,117 @@ func TestMarketplaceInstallRequiresFromWhenMany(t *testing.T) {
 	}
 	if _, err := InstallPlugin(root, "reflect", ""); err == nil || !strings.Contains(err.Error(), "--from") {
 		t.Fatalf("expected --from required: %v", err)
+	}
+}
+
+func TestNamedPluginInstallListUninstall(t *testing.T) {
+	root := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root, ProjectDescription: "keep-me"}); err != nil {
+		t.Fatal(err)
+	}
+	pack := workshopSkillsPack(t)
+	if err := AddMarketplace(root, "community", pack); err != nil {
+		t.Fatal(err)
+	}
+
+	n, err := InstallPlugin(root, "reflect@community", "")
+	if err != nil || n < 1 {
+		t.Fatalf("install name@source n=%d err=%v", n, err)
+	}
+	skill := filepath.Join(root, ".opencode", "skills", "reflect", "SKILL.md")
+	if _, err := os.Stat(skill); err != nil {
+		t.Fatal(err)
+	}
+
+	listed, err := ListInstalledPlugins(root)
+	if err != nil || len(listed) != 1 {
+		t.Fatalf("list: %v %#v", err, listed)
+	}
+	if listed[0].Name != "reflect" || listed[0].Source != "community" || listed[0].Version != "unknown" {
+		t.Fatalf("record: %#v", listed[0])
+	}
+	if listed[0].InstalledAt == "" {
+		t.Fatal("installedAt empty")
+	}
+
+	versPack := t.TempDir()
+	plugDir := filepath.Join(versPack, "plugins", "reflect")
+	if err := os.MkdirAll(plugDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(plugDir, "SKILL.md"), []byte("# v\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(plugDir, "manifest.json"), []byte(`{"version":"1.2.3"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := AddMarketplace(root, "versioned", versPack); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := InstallPlugin(root, "reflect@versioned", ""); err != nil {
+		t.Fatal(err)
+	}
+	listed, err = ListInstalledPlugins(root)
+	if err != nil || len(listed) != 1 || listed[0].Version != "1.2.3" || listed[0].Source != "versioned" {
+		t.Fatalf("versioned: %v %#v", err, listed)
+	}
+
+	missMkt, err := InstallPlugin(root, "reflect@no-such-market", "")
+	if err == nil || !strings.Contains(err.Error(), "missing marketplace") || strings.Contains(err.Error(), "missing plugin") {
+		t.Fatalf("missing marketplace: n=%d err=%v", missMkt, err)
+	}
+	missPlug, err := InstallPlugin(root, "no-such@community", "")
+	if err == nil || !strings.Contains(err.Error(), "missing plugin") || strings.Contains(err.Error(), "missing marketplace") {
+		t.Fatalf("missing plugin: n=%d err=%v", missPlug, err)
+	}
+
+	charter := filepath.Join(root, ".squad", "agents", "lead", "charter.md")
+	decisions := filepath.Join(root, ".squad", "decisions.md")
+	team := filepath.Join(root, ".squad", "team.md")
+	beforeCharter, err := os.ReadFile(charter)
+	if err != nil {
+		t.Fatal(err)
+	}
+	beforeDec, err := os.ReadFile(decisions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	beforeTeam, err := os.ReadFile(team)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := UninstallPlugin(root, "reflect"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(skill); !os.IsNotExist(err) {
+		t.Fatalf("skill still present: %v", err)
+	}
+	afterCharter, err := os.ReadFile(charter)
+	if err != nil || string(afterCharter) != string(beforeCharter) {
+		t.Fatalf("charter touched: %v %s", err, afterCharter)
+	}
+	afterDec, err := os.ReadFile(decisions)
+	if err != nil || string(afterDec) != string(beforeDec) {
+		t.Fatalf("decisions touched: %v %s", err, afterDec)
+	}
+	afterTeam, err := os.ReadFile(team)
+	if err != nil || string(afterTeam) != string(beforeTeam) || !strings.Contains(string(afterTeam), "keep-me") {
+		t.Fatalf("team touched: %v %s", err, afterTeam)
+	}
+	listed, err = ListInstalledPlugins(root)
+	if err != nil || len(listed) != 0 {
+		t.Fatalf("list after uninstall: %v %#v", err, listed)
+	}
+
+	if _, err := InstallPlugin(root, "reflect@community", ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(skill); err != nil {
+		t.Fatalf("reinstall: %v", err)
+	}
+	listed, err = ListInstalledPlugins(root)
+	if err != nil || len(listed) != 1 || listed[0].Source != "community" {
+		t.Fatalf("reinstall list: %v %#v", err, listed)
 	}
 }

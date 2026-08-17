@@ -251,6 +251,7 @@ var skipSquad = map[string]bool{
 	"config.json":          true,
 	"upstreams.json":       true,
 	"marketplaces.json":    true,
+	"plugins.json":         true,
 }
 
 func copySquadSnippets(src, dest string) (int, error) {

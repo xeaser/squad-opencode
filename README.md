@@ -76,6 +76,7 @@ OpenCode creates `.opencode/package.json` (`@opencode-ai/plugin`) and runs an in
 | `traces [--last N] [--json] [--export file]` | Local `run` / `watch` spans; `--export` writes OTLP JSON |
 | `mcp apply` / `list` / `init` | Merge org `.squad/mcp-config.json` into `opencode.json` |
 | `marketplace add` / `list` / `remove` / `browse` / `install` | Register a skills pack and copy a plugin into `.opencode/skills/` |
+| `plugin install <name>@<marketplace>` / `list` / `uninstall <name>` | Named skill install; uninstall removes only `.opencode/skills/<name>/` |
 | `help` / `version` | Usage and version string |
 
 ## Layout

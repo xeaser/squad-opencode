@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/xeaser/squad-opencode/internal/squad"
 )
@@ -23,6 +24,14 @@ type Plugin struct {
 	Source      string
 	Description string
 	Triggers    string
+}
+
+// InstalledPlugin is one skill recorded in .squad/plugins.json.
+type InstalledPlugin struct {
+	Name        string `json:"name"`
+	Source      string `json:"source"`
+	Version     string `json:"version"`
+	InstalledAt string `json:"installedAt"`
 }
 
 type marketplaceEntry struct {
@@ -127,12 +136,40 @@ func BrowsePlugins(projectRoot, name string) ([]Plugin, error) {
 	return out, nil
 }
 
+// ParsePluginSpec splits name@marketplace. A bare name has an empty marketplace.
+func ParsePluginSpec(spec string) (name, marketplace string, err error) {
+	spec = strings.TrimSpace(spec)
+	if spec == "" {
+		return "", "", fmt.Errorf("invalid plugin name %q", spec)
+	}
+	name, market, ok := strings.Cut(spec, "@")
+	if !ok {
+		return spec, "", nil
+	}
+	name = strings.TrimSpace(name)
+	market = strings.TrimSpace(market)
+	if name == "" || market == "" || strings.Contains(market, "@") {
+		return "", "", fmt.Errorf("invalid plugin spec %q (want name@marketplace)", spec)
+	}
+	return name, market, nil
+}
+
 // InstallPlugin copies plugins/<name>/ into .opencode/skills/<name>/.
-// --from is optional when exactly one marketplace is registered.
+// plugin may be name or name@marketplace. --from is optional when exactly
+// one marketplace is registered, or when the spec already names one.
 func InstallPlugin(projectRoot, plugin, from string) (int, error) {
-	plugin = strings.TrimSpace(plugin)
-	if plugin == "" || plugin != filepath.Base(plugin) || plugin == "." || plugin == ".." {
-		return 0, fmt.Errorf("invalid plugin name %q", plugin)
+	name, atFrom, err := ParsePluginSpec(plugin)
+	if err != nil {
+		return 0, err
+	}
+	if atFrom != "" {
+		if from != "" && from != atFrom {
+			return 0, fmt.Errorf("conflicting marketplace %q vs %q", atFrom, from)
+		}
+		from = atFrom
+	}
+	if name == "" || name != filepath.Base(name) || name == "." || name == ".." {
+		return 0, fmt.Errorf("invalid plugin name %q", name)
 	}
 	list, err := loadMarketplaces(projectRoot)
 	if err != nil {
@@ -144,7 +181,7 @@ func InstallPlugin(projectRoot, plugin, from string) (int, error) {
 		var ok bool
 		m, ok = findMarketplace(list, from)
 		if !ok {
-			return 0, fmt.Errorf("unknown marketplace %q", from)
+			return 0, fmt.Errorf("missing marketplace %q", from)
 		}
 	case len(list) == 1:
 		m = list[0]
@@ -158,12 +195,75 @@ func InstallPlugin(projectRoot, plugin, from string) (int, error) {
 		return 0, err
 	}
 	defer cleanup()
-	src, err := locatePluginDir(dir, plugin)
+	src, err := locatePluginDir(dir, name)
 	if err != nil {
 		return 0, err
 	}
-	dest := filepath.Join(projectRoot, ".opencode", "skills", plugin)
-	return copyPlugin(src, dest)
+	dest := filepath.Join(projectRoot, ".opencode", "skills", name)
+	n, err := copyPlugin(src, dest)
+	if err != nil {
+		return n, err
+	}
+	rec := InstalledPlugin{
+		Name:        name,
+		Source:      m.Name,
+		Version:     pluginVersion(src),
+		InstalledAt: time.Now().UTC().Format(time.RFC3339),
+	}
+	if rec.Version == "" {
+		rec.Version = "unknown"
+	}
+	if err := recordInstalledPlugin(projectRoot, rec); err != nil {
+		return n, err
+	}
+	return n, nil
+}
+
+// ListInstalledPlugins returns skills recorded in .squad/plugins.json.
+func ListInstalledPlugins(projectRoot string) ([]InstalledPlugin, error) {
+	list, err := loadInstalledPlugins(projectRoot)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]InstalledPlugin, 0, len(list))
+	for _, p := range list {
+		dest := filepath.Join(projectRoot, ".opencode", "skills", p.Name)
+		if v := pluginVersion(dest); v != "unknown" {
+			p.Version = v
+		} else if strings.TrimSpace(p.Version) == "" {
+			p.Version = "unknown"
+		}
+		if strings.TrimSpace(p.Source) == "" {
+			p.Source = "unknown"
+		}
+		out = append(out, p)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out, nil
+}
+
+// UninstallPlugin removes .opencode/skills/<name>/ only. Team memory is left alone.
+func UninstallPlugin(projectRoot, name string) error {
+	name = strings.TrimSpace(name)
+	if at := strings.Index(name, "@"); at >= 0 {
+		var err error
+		name, _, err = ParsePluginSpec(name)
+		if err != nil {
+			return err
+		}
+	}
+	if name == "" || name != filepath.Base(name) || name == "." || name == ".." {
+		return fmt.Errorf("invalid plugin name %q", name)
+	}
+	dest := filepath.Join(projectRoot, ".opencode", "skills", name)
+	if !isDir(dest) {
+		_ = removeInstalledPlugin(projectRoot, name)
+		return fmt.Errorf("plugin %q is not installed", name)
+	}
+	if err := os.RemoveAll(dest); err != nil {
+		return err
+	}
+	return removeInstalledPlugin(projectRoot, name)
 }
 
 // UnresolvedMarketplaces returns registered names whose local path cannot be resolved.
@@ -198,6 +298,87 @@ func marketplaceResolves(projectRoot, src string) bool {
 		return true
 	}
 	return false
+}
+
+func pluginsFile(projectRoot string) string {
+	return filepath.Join(squad.SquadDir(projectRoot), "plugins.json")
+}
+
+func loadInstalledPlugins(projectRoot string) ([]InstalledPlugin, error) {
+	data, err := os.ReadFile(pluginsFile(projectRoot))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var list []InstalledPlugin
+	if err := json.Unmarshal(data, &list); err != nil {
+		return nil, err
+	}
+	return list, nil
+}
+
+func saveInstalledPlugins(projectRoot string, list []InstalledPlugin) error {
+	if list == nil {
+		list = []InstalledPlugin{}
+	}
+	data, err := json.MarshalIndent(list, "", "  ")
+	if err != nil {
+		return err
+	}
+	data = append(data, '\n')
+	if err := os.MkdirAll(squad.SquadDir(projectRoot), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(pluginsFile(projectRoot), data, 0o644)
+}
+
+func recordInstalledPlugin(projectRoot string, rec InstalledPlugin) error {
+	list, err := loadInstalledPlugins(projectRoot)
+	if err != nil {
+		return err
+	}
+	replaced := false
+	for i, p := range list {
+		if p.Name == rec.Name {
+			list[i] = rec
+			replaced = true
+			break
+		}
+	}
+	if !replaced {
+		list = append(list, rec)
+	}
+	return saveInstalledPlugins(projectRoot, list)
+}
+
+func removeInstalledPlugin(projectRoot, name string) error {
+	list, err := loadInstalledPlugins(projectRoot)
+	if err != nil {
+		return err
+	}
+	out := list[:0]
+	for _, p := range list {
+		if p.Name != name {
+			out = append(out, p)
+		}
+	}
+	return saveInstalledPlugins(projectRoot, out)
+}
+
+func pluginVersion(dir string) string {
+	raw, err := os.ReadFile(filepath.Join(dir, "manifest.json"))
+	if err != nil {
+		return "unknown"
+	}
+	var m struct {
+		Version string `json:"version"`
+	}
+	if json.Unmarshal(raw, &m) != nil || strings.TrimSpace(m.Version) == "" {
+		return "unknown"
+	}
+	return strings.TrimSpace(m.Version)
 }
 
 func findMarketplace(list []Marketplace, name string) (Marketplace, bool) {
@@ -305,7 +486,7 @@ func locatePluginDir(root, name string) (string, error) {
 	if pluginDirOK(cand) {
 		return cand, nil
 	}
-	return "", fmt.Errorf("unknown plugin %q", name)
+	return "", fmt.Errorf("missing plugin %q", name)
 }
 
 func pluginDirOK(dir string) bool {
