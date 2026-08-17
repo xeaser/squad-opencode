@@ -9,7 +9,6 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"unicode"
 
 	"github.com/xeaser/squad-opencode/internal/squad"
 )
@@ -37,11 +36,6 @@ type ListItem struct {
 // OrgPath is .squad/mcp-config.json after link resolution.
 func OrgPath(projectRoot string) string {
 	return filepath.Join(squad.ResolveDir(projectRoot), "mcp-config.json")
-}
-
-// PackPath is optional pack-root mcp-config.json.
-func PackPath(projectRoot string) string {
-	return filepath.Join(projectRoot, "mcp-config.json")
 }
 
 // Parse decodes Copilot mcpServers or OpenCode mcp JSON (JSONC allowed).
@@ -102,7 +96,7 @@ func parseServer(body json.RawMessage) (Server, error) {
 	}
 	s := Server{
 		Type:    strings.TrimSpace(raw.Type),
-		URL:     strings.TrimSpace(raw.URL),
+		URL:     rewriteEnv(strings.TrimSpace(raw.URL)),
 		Headers: rewriteMap(raw.Headers),
 		Enabled: true,
 	}
@@ -113,7 +107,7 @@ func parseServer(body json.RawMessage) (Server, error) {
 	if err != nil {
 		return Server{}, err
 	}
-	s.Command = cmd
+	s.Command = rewriteSlice(cmd)
 	env := map[string]string{}
 	for k, v := range raw.Environment {
 		env[k] = rewriteEnv(v)
@@ -178,6 +172,17 @@ func rewriteMap(in map[string]string) map[string]string {
 	return out
 }
 
+func rewriteSlice(in []string) []string {
+	if len(in) == 0 {
+		return in
+	}
+	out := make([]string, len(in))
+	for i, v := range in {
+		out[i] = rewriteEnv(v)
+	}
+	return out
+}
+
 // Validate rejects hardcoded token-like values.
 func Validate(servers map[string]Server) error {
 	for name, s := range servers {
@@ -203,29 +208,22 @@ func Validate(servers map[string]Server) error {
 	return nil
 }
 
+// envSpanPattern matches rewritten {env:VAR} and leftover ${VAR} so token
+// scan ignores those spans instead of allowlisting the whole value.
+var envSpanPattern = regexp.MustCompile(`\{env:[A-Za-z_][A-Za-z0-9_]*\}|\$\{[A-Za-z_][A-Za-z0-9_]*\}`)
+
 func tokenLike(s string) string {
-	if s == "" || isEnvRef(s) {
+	if s == "" {
 		return ""
 	}
-	for _, part := range strings.FieldsFunc(s, func(r rune) bool {
-		return unicode.IsSpace(r) || r == '"' || r == '\''
-	}) {
-		if strings.HasPrefix(part, "sk-") {
-			return "sk-"
-		}
-		if strings.HasPrefix(part, "ghp_") {
-			return "ghp_"
-		}
+	stripped := envSpanPattern.ReplaceAllString(s, "")
+	if strings.Contains(stripped, "sk-") {
+		return "sk-"
+	}
+	if strings.Contains(stripped, "ghp_") {
+		return "ghp_"
 	}
 	return ""
-}
-
-func isEnvRef(s string) bool {
-	t := strings.TrimSpace(s)
-	if envVarPattern.MatchString(t) {
-		return true
-	}
-	return strings.Contains(t, "{env:")
 }
 
 // Merge writes servers into an existing opencode.json document.
@@ -280,61 +278,34 @@ func serverObject(s Server) map[string]any {
 	return obj
 }
 
-// LoadSources reads pack-root then org file. Org wins on same-name conflict.
+// LoadSources reads the resolved org mcp-config.json (after link).
+// Pack-root ingest is share.copyPackRootMCP, not an apply-time cwd read.
 func LoadSources(projectRoot string) (map[string]Server, map[string]string, error) {
 	out := map[string]Server{}
 	src := map[string]string{}
-	pack := PackPath(projectRoot)
 	org := OrgPath(projectRoot)
-	same := sameFile(pack, org)
-	if st, err := os.Stat(pack); err == nil && !st.IsDir() {
-		got, err := ParseFile(pack)
+	if st, err := os.Stat(org); err == nil && !st.IsDir() {
+		got, err := ParseFile(org)
 		if err != nil {
-			return nil, nil, fmt.Errorf("%s: %w", pack, err)
+			return nil, nil, fmt.Errorf("%s: %w", org, err)
 		}
 		for name, s := range got {
 			out[name] = s
-			src[name] = "pack"
-		}
-	}
-	if !same {
-		if st, err := os.Stat(org); err == nil && !st.IsDir() {
-			got, err := ParseFile(org)
-			if err != nil {
-				return nil, nil, fmt.Errorf("%s: %w", org, err)
-			}
-			for name, s := range got {
-				out[name] = s
-				src[name] = "org"
-			}
+			src[name] = "org"
 		}
 	}
 	return out, src, nil
 }
 
-func sameFile(a, b string) bool {
-	aa, err := filepath.Abs(a)
-	if err != nil {
-		return a == b
-	}
-	bb, err := filepath.Abs(b)
-	if err != nil {
-		return a == b
-	}
-	return aa == bb
-}
-
-// Apply merges org + pack MCP sources into projectRoot/opencode.json.
+// Apply merges the resolved org MCP file into projectRoot/opencode.json.
 func Apply(projectRoot string) error {
+	org := OrgPath(projectRoot)
+	if !fileExists(org) {
+		return fmt.Errorf("no mcp-config.json at %s", org)
+	}
 	servers, _, err := LoadSources(projectRoot)
 	if err != nil {
 		return err
-	}
-	if len(servers) == 0 {
-		org, pack := OrgPath(projectRoot), PackPath(projectRoot)
-		if !fileExists(org) && !fileExists(pack) {
-			return fmt.Errorf("no mcp-config.json at %s or pack root %s", org, pack)
-		}
 	}
 	if err := Validate(servers); err != nil {
 		return err
