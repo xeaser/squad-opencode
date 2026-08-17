@@ -74,6 +74,7 @@ OpenCode creates `.opencode/package.json` (`@opencode-ai/plugin`) and runs an in
 | `update-check [--json] [--refresh]` | Prints `up to date` or `update available` vs GitHub latest tag |
 | `traces [--last N] [--json] [--export file]` | Local `run` / `watch` spans; `--export` writes OTLP JSON |
 | `mcp apply` / `list` / `init` | Merge org `.squad/mcp-config.json` into `opencode.json` |
+| `marketplace add` / `list` / `remove` / `browse` / `install` | Register a skills pack and copy a plugin into `.opencode/skills/` |
 | `help` / `version` | Usage and version string |
 
 ## Layout
