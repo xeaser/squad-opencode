@@ -335,11 +335,11 @@ func TestCastThemeOfficeAndNone(t *testing.T) {
 	if !strings.Contains(string(team), "| Michael | Lead |") {
 		t.Fatalf("office names:\n%s", team)
 	}
-	if _, err := os.Stat(filepath.Join(root, ".opencode", "agents", "lead.md")); err != nil {
-		t.Fatal("lead.md must remain")
+	if _, err := os.Stat(filepath.Join(root, ".opencode", "agents", "michael.md")); err != nil {
+		t.Fatal("michael.md must exist after office")
 	}
-	if _, err := os.Stat(filepath.Join(root, ".opencode", "agents", "michael.md")); !os.IsNotExist(err) {
-		t.Fatal("must not write michael.md")
+	if _, err := os.Stat(filepath.Join(root, ".opencode", "agents", "lead.md")); !os.IsNotExist(err) {
+		t.Fatal("lead.md must not exist after office")
 	}
 	if code := Execute([]string{"cast", "--theme", "none"}); code != 0 {
 		t.Fatal("theme none")
@@ -350,6 +350,12 @@ func TestCastThemeOfficeAndNone(t *testing.T) {
 	}
 	if !strings.Contains(string(restored), "| Lead | Lead |") || strings.Contains(string(restored), "| Michael | Lead |") {
 		t.Fatalf("restored names:\n%s", restored)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".opencode", "agents", "lead.md")); err != nil {
+		t.Fatal("lead.md must exist after none")
+	}
+	if _, err := os.Stat(filepath.Join(root, ".opencode", "agents", "michael.md")); !os.IsNotExist(err) {
+		t.Fatal("michael.md must be gone after none")
 	}
 }
 
