@@ -15,6 +15,7 @@ Use this skill whenever you are the **squad** coordinator or doing multi-role wo
 | `.squad/charter.md` | Team norms |
 | `.squad/decisions.md` | Durable decisions |
 | `.squad/ceremonies.md` | Design Review / Retro |
+| `.squad/mentions.md` | Applied-theme mention map (**Tag now** vs **Was**) |
 | `.squad/agents/<id>/charter.md` | Role mission |
 | `.squad/agents/<id>/knowledge.md` | Role learnings |
 | `.squad/comms/` | Handoffs and ceremony write-ups |
@@ -29,7 +30,7 @@ Use this skill whenever you are the **squad** coordinator or doing multi-role wo
 ## Routing
 
 - Multi-role feature → Design Review first (see Ceremonies), then plan with Lead, implement with Frontend/Backend, verify with Tester.
-- Invoke specialists with `@lead`, `@frontend`, `@backend`, `@tester` or the task tool.
+- Invoke specialists with current tags. If `.squad/mentions.md` exists, use **Tag now** (not stale `@lead`); treat **Was** as the same specialist. Otherwise `@lead`, `@frontend`, `@backend`, `@tester` or the task tool.
 - Keep the human as approver for merges and product calls.
 
 ## Ceremonies

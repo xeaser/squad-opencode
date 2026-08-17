@@ -235,6 +235,39 @@ func TestHostAgentID(t *testing.T) {
 	}
 }
 
+func TestInitAndUpgradeTemplatesMentionMap(t *testing.T) {
+	root := t.TempDir()
+	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+
+	assertMentionCopy := func(when string) {
+		t.Helper()
+		for _, rel := range []string{
+			".opencode/agents/squad.md",
+			".opencode/skills/squad-team/SKILL.md",
+		} {
+			got, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
+			if err != nil {
+				t.Fatalf("%s read %s: %v", when, rel, err)
+			}
+			body := string(got)
+			for _, want := range []string{"mentions.md", "Tag now"} {
+				if !strings.Contains(body, want) {
+					t.Errorf("%s %s missing %q", when, rel, want)
+				}
+			}
+		}
+	}
+
+	assertMentionCopy("init")
+
+	if _, err := UpgradeHostFiles(UpgradeOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	assertMentionCopy("upgrade")
+}
+
 func TestMentionMapRoundTrip(t *testing.T) {
 	root := t.TempDir()
 	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root}); err != nil {

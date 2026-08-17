@@ -209,7 +209,26 @@ Send the `Team, add a usage endpoint…` prompt, then at least one `@backend` / 
 
 ## 3b. Hire the Office
 
-**Time:** about 5 minutes. **Optional.** Display names only. Agent IDs stay `lead` / `frontend` / `backend` / `tester` so `@lead` and recast keep working.
+**Time:** about 5 minutes. **Optional.** Two paths. Never both `lead.md` and `michael.md`.
+
+### Birth — `init --theme office`
+
+A new project can start already in Office. Agent ids **are** the tags:
+
+```bash
+squad-oc init --theme office --preset default --description "Recipe sharing app with React and Node"
+squad-oc status
+# Michael  Lead
+# Jim      Frontend
+# Dwight   Backend
+# Pam      Tester
+```
+
+Host files are native: `.opencode/agents/michael.md` exists; `lead.md` does not. There is **no** `.squad/mentions.md`. Chat with `@michael` (not `@lead`).
+
+### Later apply — `cast --theme office`
+
+On an existing default team, names change and mention files are replaced:
 
 ```bash
 squad-oc cast --theme office
@@ -220,31 +239,36 @@ squad-oc status
 # Pam      Tester
 ```
 
-| Role | Office name |
-|------|-------------|
-| Lead | Michael |
-| Frontend | Jim |
-| Backend | Dwight |
-| Tester | Pam |
-| Coordinator | Squad (not a character) |
+Memory ids stay `lead` / `frontend` / `backend` / `tester`. Host mention files do not: `michael.md` exists, `lead.md` is gone. `.squad/mentions.md` maps **Tag now** (`@michael`) to **Was** (`@lead`). The coordinator uses **Tag now**; treat **Was** as the same specialist.
 
-Chat still works either way: `@lead` or “Michael, review the API”.
+| Role | Office name | Tag now (later apply) | Was |
+|------|-------------|----------------------|-----|
+| Lead | Michael | `@michael` | `@lead` |
+| Frontend | Jim | `@jim` | `@frontend` |
+| Backend | Dwight | `@dwight` | `@backend` |
+| Tester | Pam | `@pam` | `@tester` |
+| Coordinator | Squad (not a character) | `@squad` | `@squad` |
 
-Restore role names by **id**:
+Restore role names and `@lead` files by **id** (later-apply only):
 
 ```bash
 squad-oc cast --theme none
 ```
 
+That clears the mention map and puts `lead.md` back.
+
 ### Try it
 
-`cast --theme office`, then `status`. Confirm `.opencode/agents/lead.md` still exists. Restore with `--theme none`.
+**Birth:** `init --theme office`, then `status`. Confirm `.opencode/agents/michael.md` exists, `lead.md` does not, and there is no `.squad/mentions.md`.
+
+**Later apply:** in a default project, `cast --theme office`, then `status`. Confirm `michael.md` yes, `lead.md` no, `.squad/mentions.md` yes. Restore with `--theme none`.
 
 ### Success looks like
 
-- [ ] Status shows Michael / Jim / Dwight / Pam
-- [ ] `@lead` still addresses the coordinator’s lead agent
-- [ ] `--theme none` brings back Lead / Frontend / Backend / Tester
+- [ ] Birth: status shows Michael / Jim / Dwight / Pam; only `@michael` (no mentions.md, no `lead.md`)
+- [ ] Later apply: mention map present; `@lead` gone; `@michael` works
+- [ ] Never both `lead.md` and `michael.md`
+- [ ] `--theme none` (later apply) brings back Lead / Frontend / Backend / Tester and `@lead`
 
 ---
 
@@ -655,7 +679,7 @@ Each original ease row is a **squad-oc command** you already ran, a **later** co
 | Health of the monitor | `squad-oc watch --health` |
 | Drop-in org MCP (`mcp-config.json`) | `squad-oc mcp init` / `apply` / `list` |
 | Marketplace browse + install | `squad-oc marketplace browse` / `install` |
-| Office / themed names | `squad-oc cast --theme office` (ids stay `@lead`) |
+| Office / themed names | `squad-oc init --theme office` (native `@michael`) or later `cast --theme office` (mention map; `@lead` gone) |
 | `install name@marketplace` | `squad-oc plugin install reflect@community` |
 | Reviewer lockout | protocol + files (`/squad-review`, handoff Review block) |
 | Ceremonies as files | `.squad/ceremonies.md` (design review / retro) |
