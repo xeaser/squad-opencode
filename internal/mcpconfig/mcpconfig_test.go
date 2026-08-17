@@ -126,8 +126,11 @@ func TestEnvVarRewrite(t *testing.T) {
   "mcpServers": {
     "svc": {
       "command": "npx",
-      "args": ["-y", "demo"],
+      "args": ["-y", "${PKG}"],
       "env": { "TOKEN": "${FOO}", "ALREADY": "{env:BAR}" }
+    },
+    "remote": {
+      "url": "https://example.com/${TENANT}/mcp"
     }
   }
 }`)
@@ -141,6 +144,12 @@ func TestEnvVarRewrite(t *testing.T) {
 	}
 	if env["ALREADY"] != "{env:BAR}" {
 		t.Fatalf("ALREADY %q", env["ALREADY"])
+	}
+	if !reflect.DeepEqual(servers["svc"].Command, []string{"npx", "-y", "{env:PKG}"}) {
+		t.Fatalf("command %v", servers["svc"].Command)
+	}
+	if servers["remote"].URL != "https://example.com/{env:TENANT}/mcp" {
+		t.Fatalf("url %q", servers["remote"].URL)
 	}
 }
 
@@ -187,6 +196,36 @@ func TestRejectHardcodedTokens(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "ghp_") {
 		t.Fatalf("error should mention ghp_: %v", err)
+	}
+
+	for _, tc := range []struct {
+		val string
+		tok string
+	}{
+		{"ApiKey=sk-secretvalue", "sk-"},
+		{"sk-secretvalue{env:FOO}", "sk-"},
+		{"token=ghp_secretvalue", "ghp_"},
+		{"Bearer sk-secretvalue", "sk-"},
+	} {
+		body = []byte(`{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "demo"],
+      "env": { "TOKEN": "` + tc.val + `" }
+    }
+  }
+}`)
+		if err := os.WriteFile(filepath.Join(root, ".squad", "mcp-config.json"), body, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		err = Apply(root)
+		if err == nil {
+			t.Fatalf("expected error for %q", tc.val)
+		}
+		if !strings.Contains(err.Error(), tc.tok) {
+			t.Fatalf("%q: error should mention %s: %v", tc.val, tc.tok, err)
+		}
 	}
 }
 
@@ -280,36 +319,31 @@ func TestApplyReadsLinkedTeam(t *testing.T) {
 	}
 }
 
-func TestApplyOrgWinsOverPackRoot(t *testing.T) {
+func TestApplyReadsOnlyOrgPath(t *testing.T) {
 	root := t.TempDir()
 	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
 		t.Fatal(err)
 	}
 	org := []byte(`{
   "mcpServers": {
-    "shared": {
+    "github": {
       "command": "npx",
-      "args": ["-y", "from-org"],
-      "enabled": true
+      "args": ["-y", "from-org"]
     }
   }
 }`)
-	pack := []byte(`{
+	cwd := []byte(`{
   "mcpServers": {
-    "shared": {
-      "command": "npx",
-      "args": ["-y", "from-pack"]
-    },
     "packonly": {
       "command": "npx",
-      "args": ["-y", "pack"]
+      "args": ["-y", "from-cwd"]
     }
   }
 }`)
 	if err := os.WriteFile(filepath.Join(root, ".squad", "mcp-config.json"), org, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(root, "mcp-config.json"), pack, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(root, "mcp-config.json"), cwd, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := Apply(root); err != nil {
@@ -324,13 +358,53 @@ func TestApplyOrgWinsOverPackRoot(t *testing.T) {
 		t.Fatal(err)
 	}
 	mcp, _ := doc["mcp"].(map[string]any)
-	shared, _ := mcp["shared"].(map[string]any)
-	cmd, _ := shared["command"].([]any)
-	if len(cmd) < 3 || cmd[2] != "from-org" {
-		t.Fatalf("org should win over pack: %s", raw)
+	if _, ok := mcp["github"]; !ok {
+		t.Fatalf("org server missing: %s", raw)
 	}
-	if _, ok := mcp["packonly"]; !ok {
-		t.Fatalf("pack-only server missing: %s", raw)
+	if _, ok := mcp["packonly"]; ok {
+		t.Fatalf("cwd mcp-config.json must not be an apply source: %s", raw)
+	}
+}
+
+func TestInitExampleParses(t *testing.T) {
+	servers, err := Parse([]byte(exampleConfig))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := servers["github"]; !ok {
+		t.Fatalf("example missing github: %v", servers)
+	}
+	if _, ok := servers["example-remote"]; !ok {
+		t.Fatalf("example missing example-remote: %v", servers)
+	}
+	if servers["github"].Enabled {
+		t.Fatal("example github should be disabled")
+	}
+}
+
+func TestJSONCCommentsStrip(t *testing.T) {
+	in := []byte(`
+// line comment
+{
+  /* block
+     comment */
+  "mcpServers": {
+    "svc": {
+      "command": "npx"
+    }
+  }
+}
+`)
+	servers, err := Parse(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := servers["svc"]; !ok {
+		t.Fatalf("%v", servers)
+	}
+	_, err = Parse([]byte(`{"mcpServers": {"svc": {"command": "npx"},}}`))
+	if err == nil {
+		t.Fatal("expected trailing comma to fail parse")
 	}
 }
 
