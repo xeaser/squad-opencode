@@ -111,6 +111,12 @@ func UpgradeHostFiles(opts UpgradeOptions) (UpgradeResult, error) {
 		}
 	}
 
+	if !opts.DryRun {
+		if _, err := Recast(root); err != nil {
+			return res, err
+		}
+	}
+
 	res.Message = formatUpgradeMessage(opts.DryRun, res)
 	return res, nil
 }

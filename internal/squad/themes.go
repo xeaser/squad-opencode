@@ -151,6 +151,11 @@ func ApplyTheme(projectRoot, theme string) error {
 		return err
 	}
 	next := applyThemeToTeamMarkdown(string(raw), names)
+	if norm == ThemeOffice {
+		next = rewriteOfficeMentionTags(next)
+	} else if det := Detect(projectRoot); det.Config != nil && det.Config.ThemeOrigin == ThemeOriginApplied {
+		next = restoreOfficeMentionTags(next)
+	}
 	if err := os.WriteFile(teamFile, []byte(next), 0o644); err != nil {
 		return err
 	}
@@ -279,6 +284,22 @@ func setConfigTheme(projectRoot, theme string) error {
 		return WriteMentionMap(projectRoot, appliedOfficeMentionRows())
 	}
 	return nil
+}
+
+// rewriteOfficeMentionTags remaps How to work @lead → @michael (officeTheme).
+func rewriteOfficeMentionTags(content string) string {
+	for id, name := range officeTheme {
+		content = strings.ReplaceAll(content, "@"+id, "@"+memberID(name))
+	}
+	return content
+}
+
+// restoreOfficeMentionTags remaps How to work @michael → @lead (later-apply none).
+func restoreOfficeMentionTags(content string) string {
+	for id, name := range officeTheme {
+		content = strings.ReplaceAll(content, "@"+memberID(name), "@"+id)
+	}
+	return content
 }
 
 func appliedOfficeMentionRows() []MentionRow {

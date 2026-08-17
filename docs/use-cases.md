@@ -36,7 +36,7 @@ Do not treat these as shipped. Spec: [2026-08-14-org-dx-roadmap.md](superpowers/
 |-------|---------------|------------------|-----------------|
 | P1 | Drop-in org MCP (`mcp-config.json`) | **shipped** — `mcp init` / `mcp apply` / `mcp list` | [Section 8](workshop/README.md#8-org-mcp) |
 | P2 | Marketplace browse + install | **shipped** — `marketplace add` / `browse` / `install` | [Section 9](workshop/README.md#9-skills-marketplace) |
-| P3 | Themed cast (Office first) | **shipped** — `cast --theme office` (ids stay `@lead`) | [§3b](workshop/README.md#3b-hire-the-office) |
+| P3 | Themed cast (Office first) | **shipped** — `init --theme office` (native `@michael`) or later `cast --theme office` (mention map; `@lead` gone) | [§3b](workshop/README.md#3b-hire-the-office) |
 | P4 | Named plugins (`name@marketplace`) | **shipped** — `plugin install reflect@community` | [Section 9](workshop/README.md#9-skills-marketplace) |
 | P5 | Coordinator spawn + independent review | **shipped** — templates + handoff **Review** block | [Section 10](workshop/README.md#10-independent-review) |
 | P6 | Ceremonies as files | **shipped** — `.squad/ceremonies.md` at `init` | [Section 11](workshop/README.md#11-ceremonies) |
@@ -98,7 +98,7 @@ Each original-Squad ease row is a **squad-oc command** you already ran, a **late
 | Local spans | `squad-oc traces` |
 | Drop-in `mcp-config.json` | `squad-oc mcp init` / `apply` / `list` |
 | Marketplace browse + install | `squad-oc marketplace browse` / `install` |
-| Office / themed names | later — `cast --theme office` (P3) |
+| Office / themed names | `squad-oc init --theme office` (native `@michael`) or later `cast --theme office` (mention map; `@lead` gone) |
 | `install reflect@acme` | `squad-oc plugin install reflect@community` |
 | Reviewer lockout (author cannot fix) | protocol + files (handoff Review block) |
 | Design review / retro ceremonies | `.squad/ceremonies.md` |

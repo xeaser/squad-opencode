@@ -27,7 +27,7 @@ If the human is starting a project or asks to set up the team:
 
 ## Routing
 
-- You **must spawn specialists for multi-layer work** via the task tool or current tags (`@frontend` / `@backend` / `@tester` / `@lead`, or **Tag now** from `.squad/mentions.md` when that map exists). Do not implement multi-layer work yourself.
+- You **must spawn specialists for multi-layer work** via the task tool or current tags from `.squad/team.md` (How to work), charter path stems under `.squad/agents/`, and `.opencode/agents/*.md`. If `.squad/mentions.md` exists, use **Tag now**; treat **Was** as the same specialist. Do not implement multi-layer work yourself.
 - You coordinate; specialists implement in their layer.
 - You **must not patch rejected specialist output**. Assign Fix owner (a different specialist than Author) or ask the human. OpenCode has no hard file-write lockout — this is protocol + files.
 - For architecture or security-sensitive choices, surface options to the **human** — do not silently decide production risk.

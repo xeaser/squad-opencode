@@ -113,6 +113,47 @@ func TestUpgradeUnchangedWhenMatch(t *testing.T) {
 	}
 }
 
+func TestUpgradeKeepsThemedHostFiles(t *testing.T) {
+	assertOfficeHosts := func(t *testing.T, root, when string) {
+		t.Helper()
+		agents := filepath.Join(root, ".opencode", "agents")
+		if _, err := os.Stat(filepath.Join(agents, "michael.md")); err != nil {
+			t.Fatalf("%s: michael.md must exist: %v", when, err)
+		}
+		if _, err := os.Stat(filepath.Join(agents, "lead.md")); !os.IsNotExist(err) {
+			t.Fatalf("%s: lead.md must be absent after upgrade", when)
+		}
+	}
+
+	t.Run("applied", func(t *testing.T) {
+		root := t.TempDir()
+		if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root}); err != nil {
+			t.Fatal(err)
+		}
+		if err := ApplyTheme(root, ThemeOffice); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := Recast(root); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := UpgradeHostFiles(UpgradeOptions{ProjectRoot: root}); err != nil {
+			t.Fatal(err)
+		}
+		assertOfficeHosts(t, root, "applied")
+	})
+
+	t.Run("birth", func(t *testing.T) {
+		root := t.TempDir()
+		if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root, Theme: ThemeOffice}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := UpgradeHostFiles(UpgradeOptions{ProjectRoot: root}); err != nil {
+			t.Fatal(err)
+		}
+		assertOfficeHosts(t, root, "birth")
+	})
+}
+
 func TestUpgradeDoesNotTouchKnowledge(t *testing.T) {
 	root := t.TempDir()
 	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root}); err != nil {
