@@ -209,7 +209,7 @@ Send the `Team, add a usage endpoint…` prompt, then at least one `@backend` / 
 
 ## 3b. Hire the Office
 
-**Time:** about 5 minutes. **Optional.** Display names only. Agent IDs stay `lead` / `frontend` / `backend` / `tester` so `@lead` and recast keep working.
+**Time:** about 5 minutes. **Optional.** Display names change; charter IDs stay `lead` / `frontend` / `backend` / `tester`. Recast also writes `michael.md` (and jim/dwight/pam) so you can tag **`@michael`**. `@lead` still works. OpenCode has no alias — both files are the same agent text.
 
 ```bash
 squad-oc cast --theme office
@@ -228,7 +228,7 @@ squad-oc status
 | Tester | Pam |
 | Coordinator | Squad (not a character) |
 
-Chat still works either way: `@lead` or “Michael, review the API”.
+Chat: `@michael` or `@lead`, or “Michael, review the API”.
 
 Restore role names by **id**:
 
@@ -243,7 +243,7 @@ squad-oc cast --theme none
 ### Success looks like
 
 - [ ] Status shows Michael / Jim / Dwight / Pam
-- [ ] `@lead` still addresses the coordinator’s lead agent
+- [ ] `@michael` and `@lead` both appear in the OpenCode mention list
 - [ ] `--theme none` brings back Lead / Frontend / Backend / Tester
 
 ---

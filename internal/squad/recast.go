@@ -221,6 +221,8 @@ Write lasting notes to `+"`"+`.squad/agents/%s/knowledge.md`+"`"+`.
 }
 
 // Recast writes .opencode/agents/<id>.md from the live team. Does not touch squad.md.
+// Under the office theme it also writes display-name files (michael.md) so @michael
+// works. OpenCode has no agent alias; the extra file is the same body as the id file.
 func Recast(projectRoot string) (RecastResult, error) {
 	if !IsInitialized(projectRoot) {
 		return RecastResult{}, fmt.Errorf("not initialized")
@@ -233,8 +235,13 @@ func Recast(projectRoot string) (RecastResult, error) {
 	if err := os.MkdirAll(destDir, 0o755); err != nil {
 		return RecastResult{}, err
 	}
+	theme := ""
+	if det := Detect(projectRoot); det.Config != nil {
+		theme = det.Config.Theme
+	}
 	var res RecastResult
 	tpl := TemplateFS()
+	kept := map[string]struct{}{}
 	for _, m := range members {
 		if m.ID == "" || m.ID == "squad" {
 			continue
@@ -243,14 +250,37 @@ func Recast(projectRoot string) (RecastResult, error) {
 		if err != nil {
 			return res, err
 		}
-		path := filepath.Join(destDir, m.ID+".md")
-		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		if err := writeAgentFile(destDir, m.ID, body, &res, kept); err != nil {
 			return res, err
 		}
-		res.Written++
-		res.IDs = append(res.IDs, m.ID)
+		if theme == ThemeOffice {
+			if slug := OfficeMentionSlug(m.ID); slug != "" {
+				if err := writeAgentFile(destDir, slug, body, &res, kept); err != nil {
+					return res, err
+				}
+			}
+		}
+	}
+	for _, slug := range officeMentionSlugs() {
+		if _, ok := kept[slug]; ok {
+			continue
+		}
+		_ = os.Remove(filepath.Join(destDir, slug+".md"))
 	}
 	return res, nil
+}
+
+func writeAgentFile(destDir, id, body string, res *RecastResult, kept map[string]struct{}) error {
+	if _, ok := kept[id]; ok {
+		return nil
+	}
+	if err := os.WriteFile(filepath.Join(destDir, id+".md"), []byte(body), 0o644); err != nil {
+		return err
+	}
+	res.Written++
+	res.IDs = append(res.IDs, id)
+	kept[id] = struct{}{}
+	return nil
 }
 
 func agentMarkdown(tpl fs.FS, m TeamMember) (string, error) {
