@@ -37,6 +37,22 @@ That talks to `opencode serve` on `127.0.0.1:4096`. The TUI (`opencode`) is not 
 
 Do not force-push to the default branch. Do not rewrite published tags.
 
+## Cutting a release
+
+1. Merge the PR to `main`.
+2. Wait for the `ci` check on that merge commit to go green.
+3. Tag **that main commit**, not the feature-branch SHA:
+
+   ```bash
+   git checkout main && git pull
+   git tag -a vX.Y.Z -m "squad-oc vX.Y.Z"
+   git push origin vX.Y.Z
+   ```
+
+4. The release workflow checks the tag is on `origin/main`, waits for `ci`, then GoReleaser publishes.
+
+Do not tag a feature branch. Do not move or delete a published `v*` tag. After a squash-merge the feature-branch SHA is not on `main`; tag the squash commit.
+
 ## Signed commits
 
 Commits on the default branch must be **verified** (GPG or SSH signing).
