@@ -145,3 +145,39 @@ func TestNormalizeTheme(t *testing.T) {
 		t.Fatalf("got %v", err)
 	}
 }
+
+func TestHostAgentID(t *testing.T) {
+	if HostAgentID("lead", ThemeOffice, ThemeOriginApplied) != "michael" {
+		t.Fatal()
+	}
+	if HostAgentID("lead", ThemeOffice, ThemeOriginInit) != "lead" {
+		t.Fatal("init origin: id already themed; HostAgentID is the memory id")
+	}
+	if HostAgentID("lead", "", "") != "lead" {
+		t.Fatal()
+	}
+	if HostAgentID("designer", ThemeOffice, ThemeOriginApplied) != "designer" {
+		t.Fatal("unmapped ids unchanged")
+	}
+}
+
+func TestMentionMapRoundTrip(t *testing.T) {
+	root := t.TempDir()
+	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	rows := []MentionRow{{Role: "Lead", Now: "michael", Was: "lead"}}
+	if err := WriteMentionMap(root, rows); err != nil {
+		t.Fatal(err)
+	}
+	got, err := ReadMentionMap(root)
+	if err != nil || len(got) != 1 || got[0].Now != "michael" || got[0].Was != "lead" {
+		t.Fatalf("%v %v", got, err)
+	}
+	if err := ClearMentionMap(root); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(MentionsPath(root)); !os.IsNotExist(err) {
+		t.Fatal("clear should remove mentions.md")
+	}
+}

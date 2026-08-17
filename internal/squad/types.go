@@ -12,6 +12,15 @@ type Config struct {
 	LinkPath string `json:"linkPath,omitempty"`
 	// Theme is an optional display-name theme (e.g. "office"). IDs stay stable.
 	Theme string `json:"theme,omitempty"`
+	// ThemeOrigin is how the theme was set: "init" or "applied".
+	ThemeOrigin string `json:"themeOrigin,omitempty"`
+}
+
+// MentionRow is one row in .squad/mentions.md (slugs without @).
+type MentionRow struct {
+	Role string
+	Now  string
+	Was  string
 }
 
 // TeamMember is a parsed row from .squad/team.md.

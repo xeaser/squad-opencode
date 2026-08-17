@@ -12,6 +12,9 @@ import (
 const (
 	ThemeOffice = "office"
 	ThemeNone   = "none"
+
+	ThemeOriginInit    = "init"
+	ThemeOriginApplied = "applied"
 )
 
 // ErrUnknownTheme is returned for --theme values other than office|none.
@@ -43,6 +46,74 @@ func NormalizeTheme(theme string) (string, error) {
 	default:
 		return "", fmt.Errorf("%w: %s (want office or none)", ErrUnknownTheme, theme)
 	}
+}
+
+// HostAgentID returns the OpenCode agent filename stem for a memory id.
+// Remaps only when origin is applied and id is in the office theme map.
+func HostAgentID(id, theme, origin string) string {
+	if origin == ThemeOriginApplied && theme == ThemeOffice {
+		if name, ok := officeTheme[id]; ok {
+			return strings.ToLower(name)
+		}
+	}
+	return id
+}
+
+// MentionsPath is .squad/mentions.md under the live squad directory.
+func MentionsPath(projectRoot string) string {
+	return filepath.Join(ResolveDir(projectRoot), "mentions.md")
+}
+
+// WriteMentionMap overwrites mentions.md with the role ↔ tag mapping table.
+func WriteMentionMap(projectRoot string, rows []MentionRow) error {
+	var b strings.Builder
+	b.WriteString("# Mentions\n\n")
+	b.WriteString("Theme applied after init. Use **Tag now**. Treat **Was** as the same agent.\n\n")
+	b.WriteString("| Role | Tag now | Was |\n")
+	b.WriteString("|------|---------|-----|\n")
+	for _, r := range rows {
+		fmt.Fprintf(&b, "| %s | @%s | @%s |\n", r.Role, r.Now, r.Was)
+	}
+	path := MentionsPath(projectRoot)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(path, []byte(b.String()), 0o644)
+}
+
+// ReadMentionMap parses mentions.md into slug rows (without @).
+func ReadMentionMap(projectRoot string) ([]MentionRow, error) {
+	raw, err := os.ReadFile(MentionsPath(projectRoot))
+	if err != nil {
+		return nil, err
+	}
+	var rows []MentionRow
+	for _, line := range strings.Split(string(raw), "\n") {
+		trimmed := strings.TrimSpace(strings.TrimSuffix(line, "\r"))
+		if !strings.HasPrefix(trimmed, "|") {
+			continue
+		}
+		cells := splitTableCells(trimmed)
+		if len(cells) < 3 {
+			continue
+		}
+		if strings.EqualFold(cells[0], "Role") || strings.HasPrefix(cells[0], "-") {
+			continue
+		}
+		now := strings.TrimPrefix(cells[1], "@")
+		was := strings.TrimPrefix(cells[2], "@")
+		rows = append(rows, MentionRow{Role: cells[0], Now: now, Was: was})
+	}
+	return rows, nil
+}
+
+// ClearMentionMap removes mentions.md. Missing file is success.
+func ClearMentionMap(projectRoot string) error {
+	err := os.Remove(MentionsPath(projectRoot))
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
 }
 
 func themeNames(theme string) map[string]string {
