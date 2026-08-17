@@ -14,6 +14,7 @@ import (
 
 	"github.com/xeaser/squad-opencode/internal/doctor"
 	"github.com/xeaser/squad-opencode/internal/githubissues"
+	"github.com/xeaser/squad-opencode/internal/mcpconfig"
 	"github.com/xeaser/squad-opencode/internal/opencodeclient"
 	"github.com/xeaser/squad-opencode/internal/selfupdate"
 	"github.com/xeaser/squad-opencode/internal/share"
@@ -76,6 +77,12 @@ func Execute(args []string) int {
 		return cmdUpdateCheck(rest)
 	case "traces":
 		return cmdTraces(rest)
+	case "mcp":
+		return cmdMCP(rest)
+	case "marketplace":
+		return cmdMarketplace(rest)
+	case "plugin":
+		return cmdPlugin(rest)
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown command: %s\n\n", cmd)
 		printHelp()
@@ -92,12 +99,13 @@ Usage:
   squad-oc <command> [options]
 
 Commands:
-  init [--preset default] [--description <text>] [--global]
+  init [--preset default] [--description <text>] [--global] [--theme office|none]
   upgrade [--dry-run] [--force] [--global] [--self]
   doctor | heartbeat
   status | cast
   cast --add <name> [--role <role>]
   cast --remove <name>
+  cast --theme office|none
   recast
   run -p <prompt> | --file <path> [--agent name] [--url]
   watch | triage | loop [--execute] [--interval minutes] [--once] [--health] [--url]
@@ -117,6 +125,9 @@ Commands:
   link --off
   update-check [--json] [--refresh]
   traces [--last N] [--json] [--export file]
+  mcp apply | list | init
+  marketplace add <name> <path|git-url> | list | remove <name> | browse [name] | install <plugin> [--from <name>]
+  plugin install <name>@<marketplace> | list | uninstall <name>
   help | version
 
 Team state (.squad/) is never wiped by upgrade.
@@ -135,6 +146,7 @@ func cwd() (string, int) {
 func cmdInit(args []string) int {
 	preset := "default"
 	var description string
+	var theme string
 	interactive := true
 	global := false
 	for i := 0; i < len(args); i++ {
@@ -152,6 +164,12 @@ func cmdInit(args []string) int {
 			i++
 			description = args[i]
 			interactive = false
+		case a == "--theme" && i+1 < len(args):
+			i++
+			theme = args[i]
+		case a == "--theme":
+			fmt.Fprintln(os.Stderr, "init --theme requires office or none")
+			return 2
 		case a == "--global":
 			global = true
 		case a == "--help" || a == "-h":
@@ -171,15 +189,27 @@ func cmdInit(args []string) int {
 	if code != 0 {
 		return code
 	}
+	if theme != "" {
+		norm, err := squad.NormalizeTheme(theme)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 2
+		}
+		theme = norm
+	}
 	if interactive && description == "" {
 		fmt.Print("What are you building? (optional, Enter to skip): ")
 		line, _ := bufio.NewReader(os.Stdin).ReadString('\n')
 		description = strings.TrimSpace(line)
 	}
 	result, err := squad.WriteDefaultPreset(squad.InitOptions{
-		ProjectRoot: root, Preset: preset, ProjectDescription: description, Global: global,
+		ProjectRoot: root, Preset: preset, ProjectDescription: description, Global: global, Theme: theme,
 	})
 	if err != nil {
+		if errors.Is(err, squad.ErrUnknownTheme) {
+			fmt.Fprintln(os.Stderr, err)
+			return 2
+		}
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
@@ -229,7 +259,7 @@ func cmdStatus() int {
 }
 
 func cmdCast(args []string) int {
-	var add, role, remove string
+	var add, role, remove, theme string
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch {
@@ -242,6 +272,12 @@ func cmdCast(args []string) int {
 		case a == "--role" && i+1 < len(args):
 			i++
 			role = args[i]
+		case a == "--theme" && i+1 < len(args):
+			i++
+			theme = args[i]
+		case a == "--theme":
+			fmt.Fprintln(os.Stderr, "cast --theme requires office or none")
+			return 2
 		case a == "--help" || a == "-h":
 			printHelp()
 			return 0
@@ -250,9 +286,16 @@ func cmdCast(args []string) int {
 			return 2
 		}
 	}
+	if theme != "" && (add != "" || remove != "") {
+		fmt.Fprintln(os.Stderr, "cast: use --theme alone")
+		return 2
+	}
 	if add != "" && remove != "" {
 		fmt.Fprintln(os.Stderr, "cast: use --add or --remove, not both")
 		return 2
+	}
+	if theme != "" {
+		return cmdCastTheme(theme)
 	}
 	if add == "" && remove == "" {
 		return cmdStatus()
@@ -287,6 +330,32 @@ func cmdCast(args []string) int {
 	return 0
 }
 
+func cmdCastTheme(theme string) int {
+	if _, err := squad.NormalizeTheme(theme); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 2
+	}
+	root, code := cwd()
+	if code != 0 {
+		return code
+	}
+	if err := squad.ApplyTheme(root, theme); err != nil {
+		if errors.Is(err, squad.ErrUnknownTheme) {
+			fmt.Fprintln(os.Stderr, err)
+			return 2
+		}
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	res, err := squad.Recast(root)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("theme %s; recast %d agent file(s)\n", strings.ToLower(theme), res.Written)
+	return 0
+}
+
 func cmdRecast() int {
 	root, code := cwd()
 	if code != 0 {
@@ -297,9 +366,14 @@ func cmdRecast() int {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
+	theme, origin := "", ""
+	if det := squad.Detect(root); det.Config != nil {
+		theme = det.Config.Theme
+		origin = det.Config.ThemeOrigin
+	}
 	fmt.Printf("recast %d agent file(s)\n", res.Written)
 	for _, id := range res.IDs {
-		fmt.Printf("  ~ .opencode/agents/%s.md\n", id)
+		fmt.Printf("  ~ .opencode/agents/%s.md\n", squad.HostAgentID(id, theme, origin))
 	}
 	return 0
 }
@@ -913,4 +987,239 @@ func cmdTraces(args []string) int {
 	}
 	fmt.Print(traces.FormatTable(spans))
 	return 0
+}
+
+func cmdMCP(args []string) int {
+	if len(args) < 1 {
+		fmt.Fprintln(os.Stderr, "mcp apply|list|init")
+		return 2
+	}
+	root, code := cwd()
+	if code != 0 {
+		return code
+	}
+	switch args[0] {
+	case "apply":
+		if err := mcpconfig.Apply(root); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		fmt.Println("applied MCP → opencode.json")
+		return 0
+	case "list":
+		items, err := mcpconfig.List(root)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		if len(items) == 0 {
+			fmt.Println("(no MCP servers)")
+			return 0
+		}
+		fmt.Printf("%-16s %-8s %-8s %s\n", "name", "source", "enabled", "applied")
+		for _, it := range items {
+			src := it.Source
+			if src == "" {
+				src = "-"
+			}
+			fmt.Printf("%-16s %-8s %-8t %t\n", it.Name, src, it.Enabled, it.Applied)
+		}
+		return 0
+	case "init":
+		created, path, err := mcpconfig.InitExample(root)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		rel := path
+		if r, err := filepath.Rel(root, path); err == nil {
+			rel = filepath.ToSlash(r)
+		}
+		if !created {
+			fmt.Println(rel, "already exists")
+			return 0
+		}
+		fmt.Println("wrote", rel)
+		return 0
+	default:
+		fmt.Fprintln(os.Stderr, "mcp apply|list|init")
+		return 2
+	}
+}
+
+func cmdMarketplace(args []string) int {
+	if len(args) < 1 {
+		fmt.Fprintln(os.Stderr, "marketplace add|list|remove|browse|install")
+		return 2
+	}
+	root, code := cwd()
+	if code != 0 {
+		return code
+	}
+	switch args[0] {
+	case "list":
+		list, err := share.ListMarketplaces(root)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		if len(list) == 0 {
+			fmt.Println("(no marketplaces)")
+			return 0
+		}
+		for _, m := range list {
+			fmt.Printf("%s\t%s\n", m.Name, m.Path)
+		}
+		return 0
+	case "add":
+		if len(args) < 3 {
+			fmt.Fprintln(os.Stderr, "marketplace add <name> <path|git-url>")
+			return 2
+		}
+		if err := share.AddMarketplace(root, args[1], args[2]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		fmt.Println("added", args[1])
+		return 0
+	case "remove":
+		if len(args) < 2 {
+			fmt.Fprintln(os.Stderr, "marketplace remove <name>")
+			return 2
+		}
+		if err := share.RemoveMarketplace(root, args[1]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		fmt.Println("removed", args[1])
+		return 0
+	case "browse":
+		name := ""
+		if len(args) > 1 {
+			name = args[1]
+		}
+		plugins, err := share.BrowsePlugins(root, name)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		if len(plugins) == 0 {
+			fmt.Println("(no plugins)")
+			return 0
+		}
+		fmt.Printf("%-20s %-36s %s\n", "plugin", "description", "triggers")
+		for _, p := range plugins {
+			fmt.Printf("%-20s %-36s %s\n", p.Name, p.Description, p.Triggers)
+		}
+		return 0
+	case "install":
+		plugin, from, err := parsePluginInstall(args[1:], "marketplace install <plugin> [--from <name>]")
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 2
+		}
+		n, err := share.InstallPlugin(root, plugin, from)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		fmt.Printf("installed %s (%d file(s))\n", plugin, n)
+		return 0
+	default:
+		fmt.Fprintln(os.Stderr, "marketplace add|list|remove|browse|install")
+		return 2
+	}
+}
+
+func cmdPlugin(args []string) int {
+	if len(args) < 1 {
+		fmt.Fprintln(os.Stderr, "plugin install|list|uninstall")
+		return 2
+	}
+	root, code := cwd()
+	if code != 0 {
+		return code
+	}
+	switch args[0] {
+	case "list":
+		list, err := share.ListInstalledPlugins(root)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		if len(list) == 0 {
+			fmt.Println("(no plugins)")
+			return 0
+		}
+		fmt.Printf("%-20s %-16s %s\n", "plugin", "source", "version")
+		for _, p := range list {
+			fmt.Printf("%-20s %-16s %s\n", p.Name, p.Source, p.Version)
+		}
+		return 0
+	case "install":
+		plugin, from, err := parsePluginInstall(args[1:], "plugin install <name>@<marketplace>")
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 2
+		}
+		n, err := share.InstallPlugin(root, plugin, from)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		fmt.Printf("installed %s (%d file(s))\n", plugin, n)
+		return 0
+	case "uninstall":
+		if len(args) < 2 {
+			fmt.Fprintln(os.Stderr, "plugin uninstall <name>")
+			return 2
+		}
+		if err := share.UninstallPlugin(root, args[1]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		fmt.Println("uninstalled", args[1])
+		return 0
+	default:
+		fmt.Fprintln(os.Stderr, "plugin install|list|uninstall")
+		return 2
+	}
+}
+
+func parsePluginInstall(args []string, usage string) (plugin, from string, err error) {
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		switch {
+		case a == "--from" && i+1 < len(args):
+			i++
+			from = args[i]
+		case strings.HasPrefix(a, "--from="):
+			from = strings.TrimPrefix(a, "--from=")
+		case a == "--from":
+			return "", "", fmt.Errorf("%s", usage)
+		case a == "--help" || a == "-h":
+			return "", "", fmt.Errorf("%s", usage)
+		case strings.HasPrefix(a, "-"):
+			return "", "", fmt.Errorf("unknown install flag: %s", a)
+		default:
+			if plugin != "" {
+				return "", "", fmt.Errorf("%s", usage)
+			}
+			plugin = a
+		}
+	}
+	if plugin == "" {
+		return "", "", fmt.Errorf("%s", usage)
+	}
+	name, market, err := share.ParsePluginSpec(plugin)
+	if err != nil {
+		return "", "", err
+	}
+	if market != "" {
+		if from != "" && from != market {
+			return "", "", fmt.Errorf("conflicting marketplace %q vs %q", market, from)
+		}
+		from = market
+	}
+	return name, from, nil
 }

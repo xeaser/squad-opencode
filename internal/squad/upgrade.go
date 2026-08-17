@@ -57,7 +57,7 @@ func ownedTemplateCopies() [][2]string {
 }
 
 // UpgradeHostFiles refreshes Squad-owned OpenCode/host files from embedded templates.
-// Never writes team state (team.md, charters, knowledge, decisions, config).
+// Never writes team state (team.md, charters, knowledge, decisions, ceremonies, config).
 func UpgradeHostFiles(opts UpgradeOptions) (UpgradeResult, error) {
 	root := opts.ProjectRoot
 	if root == "" {
@@ -108,6 +108,12 @@ func UpgradeHostFiles(opts UpgradeOptions) (UpgradeResult, error) {
 			res.Created = append(res.Created, destRel)
 		} else {
 			res.Updated = append(res.Updated, destRel)
+		}
+	}
+
+	if !opts.DryRun {
+		if _, err := Recast(root); err != nil {
+			return res, err
 		}
 	}
 

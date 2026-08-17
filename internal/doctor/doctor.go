@@ -7,9 +7,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
+	"github.com/xeaser/squad-opencode/internal/mcpconfig"
 	"github.com/xeaser/squad-opencode/internal/opencodeclient"
+	"github.com/xeaser/squad-opencode/internal/share"
 	"github.com/xeaser/squad-opencode/internal/squad"
 )
 
@@ -111,7 +114,88 @@ func RunChecks(projectRoot string) []Check {
 		Hard:   true,
 	})
 
+	checks = append(checks, mcpApplyCheck(projectRoot))
+	checks = append(checks, marketplaceCheck(projectRoot))
+
 	return checks
+}
+
+func mcpApplyCheck(projectRoot string) Check {
+	org := mcpconfig.OrgPath(projectRoot)
+	if !fileExists(org) {
+		return Check{
+			Name:   "MCP apply",
+			OK:     true,
+			Detail: "no org MCP file",
+			Hard:   false,
+		}
+	}
+	missing, err := mcpconfig.AppliedMissing(projectRoot)
+	if err != nil {
+		return Check{
+			Name:   "MCP apply",
+			OK:     false,
+			Detail: err.Error() + " — run: squad-oc mcp apply",
+			Hard:   false,
+		}
+	}
+	if len(missing) > 0 {
+		return Check{
+			Name:   "MCP apply",
+			OK:     false,
+			Detail: "opencode.json missing MCP server(s): " + strings.Join(missing, ", ") + " — run: squad-oc mcp apply",
+			Hard:   false,
+		}
+	}
+	return Check{
+		Name:   "MCP apply",
+		OK:     true,
+		Detail: "opencode.json has org MCP servers",
+		Hard:   false,
+	}
+}
+
+func marketplaceCheck(projectRoot string) Check {
+	list, err := share.ListMarketplaces(projectRoot)
+	if err != nil {
+		return Check{
+			Name:   "Marketplaces",
+			OK:     false,
+			Detail: err.Error(),
+			Hard:   false,
+		}
+	}
+	if len(list) == 0 {
+		return Check{
+			Name:   "Marketplaces",
+			OK:     true,
+			Detail: "no marketplaces",
+			Hard:   false,
+		}
+	}
+	bad, err := share.UnresolvedMarketplaces(projectRoot)
+	if err != nil {
+		return Check{
+			Name:   "Marketplaces",
+			OK:     false,
+			Detail: err.Error(),
+			Hard:   false,
+		}
+	}
+	if len(bad) > 0 {
+		return Check{
+			Name:   "Marketplaces",
+			OK:     false,
+			Detail: "unresolved marketplace(s): " + strings.Join(bad, ", "),
+			Hard:   false,
+		}
+	}
+	return Check{
+		Name:   "Marketplaces",
+		OK:     true,
+		Detail: "all marketplaces resolve",
+		Hard:   false,
+	}
 }
 
 // PrintAndExitCode prints checks and returns process exit code.

@@ -32,6 +32,7 @@ func TestWriteDefaultPreset(t *testing.T) {
 		".squad/team.md",
 		".squad/charter.md",
 		".squad/decisions.md",
+		".squad/ceremonies.md",
 		".squad/agents/lead/charter.md",
 		".squad/agents/frontend/charter.md",
 		".squad/agents/backend/charter.md",
@@ -45,6 +46,7 @@ func TestWriteDefaultPreset(t *testing.T) {
 		".opencode/skills/squad-handoff/SKILL.md",
 		".opencode/commands/squad-status.md",
 		".opencode/commands/squad-cast.md",
+		".opencode/commands/squad-review.md",
 		".opencode/.gitignore",
 		"opencode.json",
 	}
@@ -72,6 +74,19 @@ func TestWriteDefaultPreset(t *testing.T) {
 		t.Errorf("bad config: %+v", cfg)
 	}
 
+	cerPath := filepath.Join(root, ".squad", "ceremonies.md")
+	cer, err := os.ReadFile(cerPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(cer), "Design Review") || !strings.Contains(string(cer), "Retro") {
+		t.Error("ceremonies.md missing Design Review / Retro")
+	}
+	customCer := "# Ceremonies\n\nCUSTOM TEAM EDIT\n"
+	if err := os.WriteFile(cerPath, []byte(customCer), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
 	// idempotent
 	res2, err := WriteDefaultPreset(InitOptions{ProjectRoot: root, Preset: "default"})
 	if err != nil {
@@ -80,12 +95,49 @@ func TestWriteDefaultPreset(t *testing.T) {
 	if !res2.AlreadyInitialized || len(res2.FilesWritten) != 0 {
 		t.Fatalf("expected idempotent skip, got %+v", res2)
 	}
+	gotCer, err := os.ReadFile(cerPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(gotCer) != customCer {
+		t.Fatal("second init must not overwrite ceremonies.md")
+	}
 	if !IsInitialized(root) {
 		t.Error("expected initialized")
 	}
 	d := Detect(root)
 	if !d.Initialized || d.Config == nil || d.Config.Host != "opencode" {
 		t.Errorf("detect: %+v", d)
+	}
+}
+
+func TestInitThemeOfficeNativeIDs(t *testing.T) {
+	root := t.TempDir()
+	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root, Theme: ThemeOffice}); err != nil {
+		t.Fatal(err)
+	}
+	cfg := Detect(root).Config
+	if cfg.Theme != ThemeOffice || cfg.ThemeOrigin != ThemeOriginInit {
+		t.Fatalf("%+v", cfg)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".squad", "agents", "michael", "charter.md")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".squad", "agents", "lead")); !os.IsNotExist(err) {
+		t.Fatal("birth office must not keep agents/lead")
+	}
+	if _, err := os.Stat(filepath.Join(root, ".opencode", "agents", "michael.md")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".opencode", "agents", "lead.md")); !os.IsNotExist(err) {
+		t.Fatal("no dual files")
+	}
+	if _, err := os.Stat(MentionsPath(root)); !os.IsNotExist(err) {
+		t.Fatal("birth theme writes no mention map")
+	}
+	team, _ := os.ReadFile(filepath.Join(root, ".squad", "team.md"))
+	if !strings.Contains(string(team), "@michael") {
+		t.Fatal("How to work should document @michael")
 	}
 }
 
@@ -177,6 +229,11 @@ func TestUpgradeHostFilesGlobal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	cerPath := filepath.Join(root, ".squad", "ceremonies.md")
+	customCer := "# Ceremonies\n\nCUSTOM GLOBAL EDIT\n"
+	if err := os.WriteFile(cerPath, []byte(customCer), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	agent := filepath.Join(root, ".opencode", "agents", "squad.md")
 	if err := os.WriteFile(agent, []byte("MUTATED\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -207,5 +264,12 @@ func TestUpgradeHostFilesGlobal(t *testing.T) {
 	}
 	if !strings.Contains(string(teamAfter), "Keep me") {
 		t.Fatal("description lost")
+	}
+	gotCer, err := os.ReadFile(cerPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(gotCer) != customCer {
+		t.Fatal("ceremonies.md must not change on upgrade")
 	}
 }

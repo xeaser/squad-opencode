@@ -22,6 +22,11 @@ func TestUpgradeRestoresHostLeavesTeam(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	cerPath := filepath.Join(root, ".squad", "ceremonies.md")
+	customCer := "# Ceremonies\n\nCUSTOM TEAM EDIT\n"
+	if err := os.WriteFile(cerPath, []byte(customCer), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	agent := filepath.Join(root, ".opencode", "agents", "squad.md")
 	if err := os.WriteFile(agent, []byte("MUTATED\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -52,6 +57,13 @@ func TestUpgradeRestoresHostLeavesTeam(t *testing.T) {
 	}
 	if !strings.Contains(string(teamAfter), "Keep me") {
 		t.Fatal("description lost")
+	}
+	gotCer, err := os.ReadFile(cerPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(gotCer) != customCer {
+		t.Fatal("ceremonies.md must not change on upgrade")
 	}
 }
 
@@ -101,6 +113,47 @@ func TestUpgradeUnchangedWhenMatch(t *testing.T) {
 	}
 }
 
+func TestUpgradeKeepsThemedHostFiles(t *testing.T) {
+	assertOfficeHosts := func(t *testing.T, root, when string) {
+		t.Helper()
+		agents := filepath.Join(root, ".opencode", "agents")
+		if _, err := os.Stat(filepath.Join(agents, "michael.md")); err != nil {
+			t.Fatalf("%s: michael.md must exist: %v", when, err)
+		}
+		if _, err := os.Stat(filepath.Join(agents, "lead.md")); !os.IsNotExist(err) {
+			t.Fatalf("%s: lead.md must be absent after upgrade", when)
+		}
+	}
+
+	t.Run("applied", func(t *testing.T) {
+		root := t.TempDir()
+		if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root}); err != nil {
+			t.Fatal(err)
+		}
+		if err := ApplyTheme(root, ThemeOffice); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := Recast(root); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := UpgradeHostFiles(UpgradeOptions{ProjectRoot: root}); err != nil {
+			t.Fatal(err)
+		}
+		assertOfficeHosts(t, root, "applied")
+	})
+
+	t.Run("birth", func(t *testing.T) {
+		root := t.TempDir()
+		if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root, Theme: ThemeOffice}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := UpgradeHostFiles(UpgradeOptions{ProjectRoot: root}); err != nil {
+			t.Fatal(err)
+		}
+		assertOfficeHosts(t, root, "birth")
+	})
+}
+
 func TestUpgradeDoesNotTouchKnowledge(t *testing.T) {
 	root := t.TempDir()
 	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root}); err != nil {
@@ -111,11 +164,23 @@ func TestUpgradeDoesNotTouchKnowledge(t *testing.T) {
 	if err := os.WriteFile(know, []byte(custom), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	cerPath := filepath.Join(root, ".squad", "ceremonies.md")
+	customCer := "# Ceremonies\n\nCUSTOM TEAM EDIT\n"
+	if err := os.WriteFile(cerPath, []byte(customCer), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := UpgradeHostFiles(UpgradeOptions{ProjectRoot: root, Force: true}); err != nil {
 		t.Fatal(err)
 	}
 	got, _ := os.ReadFile(know)
 	if string(got) != custom {
 		t.Fatalf("knowledge overwritten:\n%s", got)
+	}
+	gotCer, err := os.ReadFile(cerPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(gotCer) != customCer {
+		t.Fatal("ceremonies.md must not change on upgrade")
 	}
 }

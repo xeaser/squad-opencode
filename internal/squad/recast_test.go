@@ -80,6 +80,67 @@ func TestRecastUsesStockLeadTemplate(t *testing.T) {
 	}
 }
 
+func TestRecastBirthUsesStockLeadTemplate(t *testing.T) {
+	root := t.TempDir()
+	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root, Theme: ThemeOffice}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(filepath.Join(root, ".opencode", "agents", "michael.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(got)
+	if !strings.Contains(body, "You are **Lead**") {
+		t.Fatalf("birth recast must use stock Lead prompt, not a generic stub:\n%s", body)
+	}
+	if strings.Contains(body, "You are **Michael**") {
+		t.Fatalf("birth recast must not fall back to generic stub:\n%s", body)
+	}
+	if !strings.Contains(body, ".squad/agents/michael/") {
+		t.Fatalf("birth michael.md must point at native agent dir:\n%s", body)
+	}
+	if strings.Contains(body, ".squad/agents/lead/") {
+		t.Fatalf("birth michael.md must not keep stock role path (shadow agents/lead):\n%s", body)
+	}
+	for _, pair := range []struct{ host, role string }{
+		{"jim", "frontend"},
+		{"dwight", "backend"},
+		{"pam", "tester"},
+	} {
+		gotRole, err := os.ReadFile(filepath.Join(root, ".opencode", "agents", pair.host+".md"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		roleBody := string(gotRole)
+		if !strings.Contains(roleBody, ".squad/agents/"+pair.host+"/") {
+			t.Fatalf("birth %s.md must point at native agent dir:\n%s", pair.host, roleBody)
+		}
+		if strings.Contains(roleBody, ".squad/agents/"+pair.role+"/") {
+			t.Fatalf("birth %s.md must not keep stock role path:\n%s", pair.host, roleBody)
+		}
+	}
+}
+
+func TestRecastAppliedKeepsStockLeadPrompt(t *testing.T) {
+	root := t.TempDir()
+	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	if err := ApplyTheme(root, ThemeOffice); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Recast(root); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(filepath.Join(root, ".opencode", "agents", "michael.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(got), "You are **Lead**") {
+		t.Fatalf("applied recast must keep full Lead prompt:\n%s", got)
+	}
+}
+
 func TestRemoveMemberDeletesHostAgent(t *testing.T) {
 	root := t.TempDir()
 	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root}); err != nil {
@@ -106,6 +167,46 @@ func TestRemoveMemberDeletesHostAgent(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(root, ".opencode", "agents", "squad.md")); err != nil {
 		t.Fatal("coordinator agent should remain")
 	}
+}
+
+func TestRemoveMemberDeletesThemedHostSlug(t *testing.T) {
+	t.Run("applied", func(t *testing.T) {
+		root := t.TempDir()
+		if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root}); err != nil {
+			t.Fatal(err)
+		}
+		if err := ApplyTheme(root, ThemeOffice); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := Recast(root); err != nil {
+			t.Fatal(err)
+		}
+		if err := RemoveMember(root, "Tester"); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := os.Stat(filepath.Join(root, ".opencode", "agents", "pam.md")); !os.IsNotExist(err) {
+			t.Fatal("applied office: pam.md must be removed")
+		}
+		if _, err := os.Stat(filepath.Join(root, ".squad", "agents", "tester", "charter.md")); err != nil {
+			t.Fatal("applied office: tester charter should remain")
+		}
+	})
+
+	t.Run("birth", func(t *testing.T) {
+		root := t.TempDir()
+		if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root, Theme: ThemeOffice}); err != nil {
+			t.Fatal(err)
+		}
+		if err := RemoveMember(root, "Pam"); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := os.Stat(filepath.Join(root, ".opencode", "agents", "pam.md")); !os.IsNotExist(err) {
+			t.Fatal("birth: pam.md must be removed")
+		}
+		if _, err := os.Stat(filepath.Join(root, ".squad", "agents", "pam", "charter.md")); err != nil {
+			t.Fatal("birth: pam charter should remain")
+		}
+	})
 }
 
 func TestRemoveMemberMatchesIDAndName(t *testing.T) {

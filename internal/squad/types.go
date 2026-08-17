@@ -10,6 +10,17 @@ type Config struct {
 	ExternalPath string `json:"externalPath,omitempty"`
 	// LinkPath, if set, is a remote/shared team directory (link).
 	LinkPath string `json:"linkPath,omitempty"`
+	// Theme is an optional display-name theme (e.g. "office"). IDs stay stable.
+	Theme string `json:"theme,omitempty"`
+	// ThemeOrigin is how the theme was set: "init" or "applied".
+	ThemeOrigin string `json:"themeOrigin,omitempty"`
+}
+
+// MentionRow is one row in .squad/mentions.md (slugs without @).
+type MentionRow struct {
+	Role string
+	Now  string
+	Was  string
 }
 
 // TeamMember is a parsed row from .squad/team.md.
@@ -37,6 +48,8 @@ type InitOptions struct {
 	Force              bool
 	// Global writes into GlobalSquadDir() instead of ProjectRoot.
 	Global bool
+	// Theme is optional (office|none). Office mints native character IDs at birth.
+	Theme string
 }
 
 // InitResult is the outcome of init.

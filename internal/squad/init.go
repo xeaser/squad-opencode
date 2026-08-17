@@ -63,12 +63,32 @@ func WriteDefaultPreset(opts InitOptions) (InitResult, error) {
 		return InitResult{}, fmt.Errorf("copy opencode templates: %w", err)
 	}
 
+	theme := strings.TrimSpace(opts.Theme)
+	var norm string
+	if theme != "" {
+		var err error
+		norm, err = NormalizeTheme(theme)
+		if err != nil {
+			return InitResult{}, err
+		}
+	}
+	officeBirth := norm == ThemeOffice
+	if officeBirth {
+		if err := mintOfficeNativeIDs(root); err != nil {
+			return InitResult{}, err
+		}
+	}
+
 	// config.json
 	cfg := Config{
 		Version:            1,
 		Host:               "opencode",
 		Preset:             preset,
 		ProjectDescription: opts.ProjectDescription,
+	}
+	if officeBirth {
+		cfg.Theme = ThemeOffice
+		cfg.ThemeOrigin = ThemeOriginInit
 	}
 	cfgBytes, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
@@ -104,6 +124,12 @@ func WriteDefaultPreset(opts InitOptions) (InitResult, error) {
 		}
 	}
 
+	if officeBirth {
+		if _, err := Recast(root); err != nil {
+			return InitResult{}, err
+		}
+	}
+
 	// unique + sort
 	written = uniqueSorted(written)
 
@@ -113,6 +139,191 @@ func WriteDefaultPreset(opts InitOptions) (InitResult, error) {
 		FilesWritten:       written,
 		Message:            fmt.Sprintf("Initialized Squad for OpenCode (preset: %s).", preset),
 	}, nil
+}
+
+// mintOfficeNativeIDs rewrites a default scaffold to Office character IDs.
+// Memory ids become michael/jim/dwight/pam. Coordinator stays Squad.
+func mintOfficeNativeIDs(root string) error {
+	teamFile := filepath.Join(ResolveDir(root), "team.md")
+	raw, err := os.ReadFile(teamFile)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(teamFile, []byte(rewriteTeamForOfficeBirth(string(raw))), 0o644); err != nil {
+		return err
+	}
+	if err := applyThemeToCharters(root, officeTheme); err != nil {
+		return err
+	}
+	if err := rewriteOfficeCharterPaths(root); err != nil {
+		return err
+	}
+	return renameOfficeAgentDirs(root)
+}
+
+func rewriteTeamForOfficeBirth(content string) string {
+	content = applyThemeToTeamMarkdown(content, officeTheme)
+	for id, name := range officeTheme {
+		native := memberID(name)
+		content = strings.ReplaceAll(content, ".squad/agents/"+id+"/", ".squad/agents/"+native+"/")
+	}
+	return rewriteOfficeMentionTags(content)
+}
+
+func rewriteOfficeCharterPaths(root string) error {
+	base := filepath.Join(ResolveDir(root), "agents")
+	for id, name := range officeTheme {
+		native := memberID(name)
+		path := filepath.Join(base, id, "charter.md")
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return err
+		}
+		next := strings.ReplaceAll(string(raw), ".squad/agents/"+id+"/", ".squad/agents/"+native+"/")
+		if next == string(raw) {
+			continue
+		}
+		if err := os.WriteFile(path, []byte(next), 0o644); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// restoreOfficeNativeIDs undoes a birth office mint: memory ids go back to
+// lead/frontend/backend/tester. Extra seats are left alone.
+func restoreOfficeNativeIDs(root string) error {
+	teamFile := filepath.Join(ResolveDir(root), "team.md")
+	raw, err := os.ReadFile(teamFile)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(teamFile, []byte(rewriteTeamForOfficeRestore(string(raw))), 0o644); err != nil {
+		return err
+	}
+	if err := applyThemeToNativeCharters(root, roleNameByID); err != nil {
+		return err
+	}
+	if err := restoreOfficeCharterPaths(root); err != nil {
+		return err
+	}
+	return renameNativeAgentDirsToRoles(root)
+}
+
+func rewriteTeamForOfficeRestore(content string) string {
+	for id, name := range officeTheme {
+		native := memberID(name)
+		content = strings.ReplaceAll(content, ".squad/agents/"+native+"/", ".squad/agents/"+id+"/")
+	}
+	content = restoreOfficeMentionTags(content)
+	return applyThemeToTeamMarkdown(content, roleNameByID)
+}
+
+func applyThemeToNativeCharters(root string, titles map[string]string) error {
+	base := filepath.Join(ResolveDir(root), "agents")
+	for id, name := range officeTheme {
+		native := memberID(name)
+		title, ok := titles[id]
+		if !ok {
+			continue
+		}
+		path := filepath.Join(base, native, "charter.md")
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return err
+		}
+		next := applyThemeToCharterTitle(string(raw), title)
+		if next == string(raw) {
+			continue
+		}
+		if err := os.WriteFile(path, []byte(next), 0o644); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func restoreOfficeCharterPaths(root string) error {
+	base := filepath.Join(ResolveDir(root), "agents")
+	for id, name := range officeTheme {
+		native := memberID(name)
+		path := filepath.Join(base, native, "charter.md")
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return err
+		}
+		next := strings.ReplaceAll(string(raw), ".squad/agents/"+native+"/", ".squad/agents/"+id+"/")
+		if next == string(raw) {
+			continue
+		}
+		if err := os.WriteFile(path, []byte(next), 0o644); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func renameNativeAgentDirsToRoles(root string) error {
+	base := filepath.Join(ResolveDir(root), "agents")
+	for id, name := range officeTheme {
+		native := memberID(name)
+		if native == "" || native == id {
+			continue
+		}
+		src := filepath.Join(base, native)
+		dst := filepath.Join(base, id)
+		if _, err := os.Stat(src); err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return err
+		}
+		if _, err := os.Stat(dst); err == nil {
+			if err := os.RemoveAll(dst); err != nil {
+				return err
+			}
+		}
+		if err := os.Rename(src, dst); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func renameOfficeAgentDirs(root string) error {
+	base := filepath.Join(ResolveDir(root), "agents")
+	for id, name := range officeTheme {
+		native := memberID(name)
+		if native == "" || native == id {
+			continue
+		}
+		src := filepath.Join(base, id)
+		dst := filepath.Join(base, native)
+		if _, err := os.Stat(src); err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return err
+		}
+		if _, err := os.Stat(dst); err == nil {
+			if err := os.RemoveAll(dst); err != nil {
+				return err
+			}
+		}
+		if err := os.Rename(src, dst); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func applyDescriptionFile(path, description string) error {
