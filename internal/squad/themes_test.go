@@ -78,25 +78,16 @@ func TestApplyThemeOfficeThenNone(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []string{"lead", "frontend", "backend", "tester"}
+	if !sameIDs(res.IDs, want) {
+		t.Fatalf("recast ids %v want %v", res.IDs, want)
+	}
 	for _, id := range want {
 		if _, err := os.Stat(filepath.Join(root, ".opencode", "agents", id+".md")); err != nil {
 			t.Fatalf("missing host agent %s: %v", id, err)
 		}
 	}
-	for id, name := range officeTheme {
-		slug := memberID(name)
-		alias := filepath.Join(root, ".opencode", "agents", slug+".md")
-		if _, err := os.Stat(alias); err != nil {
-			t.Fatalf("missing @mention file %s: %v", slug, err)
-		}
-		idBody, _ := os.ReadFile(filepath.Join(root, ".opencode", "agents", id+".md"))
-		aliasBody, _ := os.ReadFile(alias)
-		if string(idBody) != string(aliasBody) {
-			t.Fatalf("%s.md and %s.md should match", id, slug)
-		}
-	}
-	if !containsAll(res.IDs, append(append([]string{}, want...), "michael", "jim", "dwight", "pam")...) {
-		t.Fatalf("recast ids %v", res.IDs)
+	if _, err := os.Stat(filepath.Join(root, ".opencode", "agents", "michael.md")); !os.IsNotExist(err) {
+		t.Fatal("must not write michael.md")
 	}
 
 	if err := ApplyTheme(root, "none"); err != nil {
@@ -117,21 +108,17 @@ func TestApplyThemeOfficeThenNone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !containsAll(res2.IDs, want...) {
+	if !sameIDs(res2.IDs, want) {
 		t.Fatalf("recast ids after none %v want %v", res2.IDs, want)
-	}
-	if _, err := os.Stat(filepath.Join(root, ".opencode", "agents", "michael.md")); !os.IsNotExist(err) {
-		t.Fatal("theme none should remove michael.md")
 	}
 }
 
-func containsAll(got []string, want ...string) bool {
-	have := map[string]bool{}
-	for _, s := range got {
-		have[s] = true
+func sameIDs(got, want []string) bool {
+	if len(got) != len(want) {
+		return false
 	}
-	for _, s := range want {
-		if !have[s] {
+	for i := range want {
+		if got[i] != want[i] {
 			return false
 		}
 	}
@@ -146,15 +133,6 @@ func TestApplyThemeUnknown(t *testing.T) {
 	err := ApplyTheme(root, "parks")
 	if !errors.Is(err, ErrUnknownTheme) {
 		t.Fatalf("got %v", err)
-	}
-}
-
-func TestOfficeMentionSlug(t *testing.T) {
-	if got := OfficeMentionSlug("lead"); got != "michael" {
-		t.Fatalf("got %q", got)
-	}
-	if got := OfficeMentionSlug("designer"); got != "" {
-		t.Fatalf("got %q", got)
 	}
 }
 
