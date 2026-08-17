@@ -73,7 +73,7 @@ func ReplaceExecutable(current, downloaded string) error {
 }
 
 // UpgradeSelf fetches the latest GitHub release for repo and replaces this binary.
-// Returns "updated 0.2.1 → 0.3.0" or "already 0.3.0".
+// Returns "updated 0.3.0 → 0.4.0" or "already 0.4.0".
 func UpgradeSelf(client *http.Client, repo, currentVersion string) (string, error) {
 	if client == nil {
 		client = &http.Client{Timeout: 60 * time.Second}
