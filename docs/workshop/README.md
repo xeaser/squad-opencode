@@ -250,7 +250,7 @@ Three roles:
 | Pack owner | `acme/squad-skills` | Add `.opencode/skills/…` (and optional extra agents) |
 | Service | e.g. `billing` | `init` → `link` → `upstream add` → `sync` → `doctor` |
 
-`link` does not move files. Each service keeps its own `config.json`; `squad-oc status` / `doctor` read `team.md`, charters, and decisions from the platform directory. `upstream sync` copies pack files into **this** repo’s `.opencode/` (new `.squad/agents/…` only if missing). It never overwrites `team.md` or `decisions.md`.
+`link` does not move files. Each service keeps its own `config.json`. `squad-oc status` reads roster and decisions from the platform; `doctor`'s team-file check follows the link. `upstream sync` copies pack files into **this** repo's `.opencode/` (new `.squad/agents/…` only if missing). It never overwrites `team.md` or `decisions.md`.
 
 ### Phase 0 org example
 
@@ -271,9 +271,10 @@ opencode   # Tab → squad → "Set up the team" → yes
 
 ### Try it
 
-Runnable with local folders (no `acme` GitHub org required):
+Runnable with local folders (no `acme` GitHub org required). Leave the solo recipe repo first so this is not nested inside `my-recipe-app`:
 
 ```bash
+cd ..
 mkdir acme
 mkdir acme/squad-platform
 mkdir acme/squad-skills
@@ -324,6 +325,7 @@ cd ../billing
 git init
 squad-oc init --preset default
 squad-oc link ../squad-platform
+# relative pack path — run add and later sync from this service root
 squad-oc upstream add org ../squad-skills
 squad-oc upstream sync org
 squad-oc doctor
@@ -331,9 +333,9 @@ squad-oc status
 opencode
 ```
 
-In OpenCode: Tab → **squad** → “Set up the team” → **yes**.
+In OpenCode: Tab → **squad** → "Set up the team" → **yes**.
 
-Same commands with a git pack URL: `squad-oc upstream add org <url>` then `squad-oc upstream sync org`.
+Same commands with a git pack URL: `squad-oc upstream add org <url>` then `squad-oc upstream sync org` (still from the service root).
 
 ### Success looks like
 
@@ -363,7 +365,8 @@ Needs:
 `watch --execute` starts `opencode serve` on `http://127.0.0.1:4096` if nothing is listening there. It will **not** auto-start if you pass `--url` or set `OPENCODE_BASE_URL` to anything else. Plain `opencode` does not listen on 4096.
 
 ```bash
-# in the service (or solo) repo, after gh knows the remote
+# in the service (or solo) repo — or any repo gh already sees
+gh repo create --source=. --public --push
 gh label create squad --description "Squad work" --force
 gh issue create --title "Add usage endpoint" --body "GET /api/usage, auth required." --label squad
 
@@ -384,7 +387,8 @@ Leave a loop running only if you want it (not required here):
 
 ```bash
 squad-oc watch --execute --interval 10 --label squad
-# stop: touch .squad/ralph-stop
+# stop (Unix): touch .squad/ralph-stop
+# stop (PowerShell): New-Item .squad/ralph-stop
 ```
 
 Overnight quiet (no serve calls in the window) is `--overnight-start 18:00 --overnight-end 08:00`. Skip it in this 90 minutes.
