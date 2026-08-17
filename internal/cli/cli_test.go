@@ -544,3 +544,72 @@ func TestMarketplaceBrowseInstallViaCLI(t *testing.T) {
 		t.Fatal("second install")
 	}
 }
+
+func TestPluginInstallListUninstallViaCLI(t *testing.T) {
+	root := t.TempDir()
+	prev, _ := os.Getwd()
+	if err := os.Chdir(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(prev) })
+
+	if code := Execute([]string{"init", "--preset", "default", "--description", "plug"}); code != 0 {
+		t.Fatal("init")
+	}
+	help := captureStdout(t, func() {
+		if Execute([]string{"help"}) != 0 {
+			t.Fatal("help")
+		}
+	})
+	if !strings.Contains(help, "plugin install <name>@<marketplace>") {
+		t.Fatalf("help missing plugin line: %s", help)
+	}
+
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("caller")
+	}
+	pack := filepath.Join(filepath.Dir(thisFile), "..", "..", "docs", "workshop", "fixtures", "skills-pack")
+	if code := Execute([]string{"marketplace", "add", "community", pack}); code != 0 {
+		t.Fatal("add")
+	}
+
+	if Execute([]string{"plugin"}) != 2 {
+		t.Fatal("plugin without subcommand should be 2")
+	}
+	if Execute([]string{"plugin", "install"}) != 2 {
+		t.Fatal("plugin install without spec should be 2")
+	}
+	if Execute([]string{"plugin", "uninstall"}) != 2 {
+		t.Fatal("plugin uninstall without name should be 2")
+	}
+
+	if code := Execute([]string{"plugin", "install", "reflect@community"}); code != 0 {
+		t.Fatal("plugin install")
+	}
+	if _, err := os.Stat(filepath.Join(root, ".opencode", "skills", "reflect", "SKILL.md")); err != nil {
+		t.Fatal(err)
+	}
+	listed := captureStdout(t, func() {
+		if Execute([]string{"plugin", "list"}) != 0 {
+			t.Fatal("list")
+		}
+	})
+	if !strings.Contains(listed, "reflect") || !strings.Contains(listed, "community") || !strings.Contains(listed, "unknown") {
+		t.Fatalf("plugin list: %s", listed)
+	}
+
+	if code := Execute([]string{"plugin", "uninstall", "reflect"}); code != 0 {
+		t.Fatal("uninstall")
+	}
+	if _, err := os.Stat(filepath.Join(root, ".opencode", "skills", "reflect")); !os.IsNotExist(err) {
+		t.Fatalf("skill still present: %v", err)
+	}
+
+	if code := Execute([]string{"marketplace", "install", "reflect@community"}); code != 0 {
+		t.Fatal("marketplace install alias")
+	}
+	if _, err := os.Stat(filepath.Join(root, ".opencode", "skills", "reflect", "SKILL.md")); err != nil {
+		t.Fatal(err)
+	}
+}
