@@ -456,28 +456,20 @@ If you have no GitHub remote yet, stop after reading the commands — do not fak
 
 ## 7. What's next
 
-**Time:** about 5 minutes. **Stubs** for phases that are **not** shipped. Do not run the commands in this table.
+**Time:** about 5 minutes.
 
-| Later | Phase | Intent |
-|-------|-------|--------|
-| Named plugins | P4 | `plugin install reflect@acme` instead of a path |
-
-Shipped after Phase 0: **§8 Org MCP**, **§9 marketplace**, **§10 independent review** (protocol + files, not a kernel lock), **§11 ceremonies**.
-
-Still later:
-
-- **Named plugins** — `plugin install reflect@community` once P4 lands
+P1–P6 from the org DX roadmap are in this workshop now (MCP, marketplace, Office names, named plugins, review protocol, ceremonies). What we still **will not** port is in [Out of scope](#out-of-scope) and [use-cases.md](../use-cases.md).
 
 WorkIQ, Outlook COM, and Teams Adaptive Cards are **not** product features. Section 8 may *mention* Teams/ADO/GitHub as example MCP servers.
 
 ### Try it
 
-Read the table. Confirm `squad-oc help` lists `mcp` and `marketplace` and has **no** `plugin install name@source` yet.
+Confirm `squad-oc help` lists `mcp`, `marketplace`, `plugin`, and `cast --theme`.
 
 ### Success looks like
 
-- [ ] You can name what is later (Office theme, named plugins) vs what you already ran
-- [ ] You did not wait on P3–P4 to adopt `init` / `link` / `upstream` / `watch` / `mcp` / `marketplace`
+- [ ] You can run the shipped commands without reading original Squad docs
+- [ ] You can name the won’t-port rows (Copilot CLI, Ink shell, Aspire, `squad_state`)
 
 ---
 
@@ -565,6 +557,14 @@ squad-oc marketplace install reflect --from community
 ```
 
 If only one marketplace is registered, `--from` is optional.
+
+Prefer the named form when you know the source:
+
+```bash
+squad-oc plugin install reflect@community
+squad-oc plugin list
+# path-based install remains the fallback: marketplace install reflect --from community
+```
 
 In OpenCode as **squad**:
 
@@ -656,7 +656,7 @@ Each original ease row is a **squad-oc command** you already ran, a **later** co
 | Drop-in org MCP (`mcp-config.json`) | `squad-oc mcp init` / `apply` / `list` |
 | Marketplace browse + install | `squad-oc marketplace browse` / `install` |
 | Office / themed names | `squad-oc cast --theme office` (ids stay `@lead`) |
-| `install name@marketplace` | later (P4) |
+| `install name@marketplace` | `squad-oc plugin install reflect@community` |
 | Reviewer lockout | protocol + files (`/squad-review`, handoff Review block) |
 | Ceremonies as files | `.squad/ceremonies.md` (design review / retro) |
 | GitHub Copilot CLI / Copilot SDK | **won’t port** |
