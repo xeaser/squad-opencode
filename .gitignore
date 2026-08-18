@@ -47,8 +47,21 @@ Desktop.ini
 .vscode/
 *.log
 
-# Agent session scratch
+# Agent session scratch (plans, specs, SDD) — not domain docs/
 .superpowers/
+
+# Playwright / browser session scratch
+# Named MCP screenshots belong in .playwright-mcp/ (see AGENTS.md).
+# /dummy-*.png is a safety net if an agent still writes to the repo root.
+.playwright-mcp/
+/playwright-report/
+/blob-report/
+/test-results/
+/playwright/.cache/
+/playwright/.auth/
+/dummy-*.png
+*.webm
+
 
 # Beads / Dolt files (added by bd init)
 .dolt/

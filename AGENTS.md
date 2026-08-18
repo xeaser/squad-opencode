@@ -140,6 +140,16 @@ Public product work stays on GitHub Issues. `squad-oc watch` / `triage` / `loop`
 
 Beads (`bd`) tracks in-repo agent work: implementation tasks, discovered follow-ups, and session memory. Do not replace the GitHub flow with beads, and do not keep a second markdown TODO list.
 
+## Playwright screenshots
+
+Save MCP screenshots and page dumps under `.playwright-mcp/` (gitignored). Do not write `dummy-*.png` or other shots at the repo root.
+
+```
+filename: .playwright-mcp/dummy-mentions-summary.png
+```
+
+A bare `dummy-foo.png` lands in the workspace root. Unnamed snapshots already go in `.playwright-mcp/`.
+
 ## Build & Test
 
 ```bash
