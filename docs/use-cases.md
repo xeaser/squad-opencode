@@ -24,13 +24,11 @@ Host is **OpenCode**. You do **not** need Copilot, Node, or the original Squad C
 | [10. Independent review](workshop/README.md#10-independent-review) | Tester rejects; author ≠ fix owner | handoff Review block; `/squad-review` | **supported today** |
 | [11. Ceremonies](workshop/README.md#11-ceremonies) | Design review / retro files | `.squad/ceremonies.md` | **supported today** |
 
-Section 7 is documentation only. `squad-oc help` lists `mcp apply | list | init`. It has no `marketplace` or `plugin` command until those phases land.
+Section 7 is documentation only.
 
 ---
 
-## Later phases
-
-Do not treat these as shipped. Spec: [2026-08-14-org-dx-roadmap.md](superpowers/specs/2026-08-14-org-dx-roadmap.md).
+## Org DX phases
 
 | Phase | Original ease | Planned squad-oc | Workshop add-on |
 |-------|---------------|------------------|-----------------|
