@@ -31,7 +31,7 @@ var (
 )
 
 // AssetName is the goreleaser archive for goos/goarch at version.Version.
-// Format: squad-oc_<version>_<os>_<arch>.zip (windows) or .tar.gz (else).
+// Format: <Name>_<version>_<os>_<arch>.zip (windows) or .tar.gz (else).
 func AssetName(goos, goarch string) string {
 	return assetName(version.Version, goos, goarch)
 }
@@ -42,7 +42,7 @@ func assetName(ver, goos, goarch string) string {
 	if goos == "windows" {
 		ext = ".zip"
 	}
-	return fmt.Sprintf("squad-oc_%s_%s_%s%s", ver, goos, goarch, ext)
+	return fmt.Sprintf("%s_%s_%s_%s%s", version.Name, ver, goos, goarch, ext)
 }
 
 // ReplaceExecutable copies downloaded over current.
@@ -233,7 +233,7 @@ func extractZip(archivePath, destDir string) (string, error) {
 		rc.Close()
 		return dest, err
 	}
-	return "", fmt.Errorf("archive does not contain squad-oc")
+	return "", fmt.Errorf("archive does not contain %s", version.Name)
 }
 
 func extractTarGz(archivePath, destDir string) (string, error) {
@@ -268,12 +268,12 @@ func extractTarGz(archivePath, destDir string) (string, error) {
 		}
 		return dest, nil
 	}
-	return "", fmt.Errorf("archive does not contain squad-oc")
+	return "", fmt.Errorf("archive does not contain %s", version.Name)
 }
 
 func isReleaseBinary(name string) bool {
 	base := filepath.Base(filepath.ToSlash(name))
-	return base == "squad-oc" || base == "squad-oc.exe"
+	return base == version.Name || base == version.Name+".exe"
 }
 
 func writeNewFile(dest string, r io.Reader) error {

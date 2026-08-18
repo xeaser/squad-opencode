@@ -51,6 +51,8 @@ Do not force-push to the default branch. Do not rewrite published tags.
 
 4. The release workflow checks the tag is on `origin/main`, waits for `ci`, then GoReleaser publishes.
 
+`go build` (and CI's compile job) report `dev`. GoReleaser injects the tag into `version.Version`, so `squad-oc version` on a release binary matches the tag. Do not edit `internal/version/version.go` to bump the version.
+
 Do not tag a feature branch. Do not move or delete a published `v*` tag. After a squash-merge the feature-branch SHA is not on `main`; tag the squash commit.
 
 ## Signed commits

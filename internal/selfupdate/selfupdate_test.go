@@ -97,7 +97,7 @@ func TestReplaceExecutableRenameFailsLeavesNew(t *testing.T) {
 
 func TestUpgradeSelfAlready(t *testing.T) {
 	srv := releaseServer(t, version.Version, nil)
-	msg, err := UpgradeSelf(srv.Client(), "xeaser/squad-opencode", version.Version)
+	msg, err := UpgradeSelf(srv.Client(), version.Repo, version.Version)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +136,7 @@ func TestUpgradeSelfRejectsArchiveWithoutBinary(t *testing.T) {
 	lookupExe = func() (string, error) { return dummy, nil }
 	t.Cleanup(func() { lookupExe = os.Executable })
 
-	_, err := UpgradeSelf(srv.Client(), "xeaser/squad-opencode", "0.2.1")
+	_, err := UpgradeSelf(srv.Client(), version.Repo, "0.2.1")
 	if err == nil {
 		t.Fatal("expected error for archive without squad-oc")
 	}
@@ -162,7 +162,7 @@ func runUpgradeSelf(t *testing.T, goos, goarch, binName string, archive, payload
 	lookupExe = func() (string, error) { return dummy, nil }
 	t.Cleanup(func() { lookupExe = os.Executable })
 
-	msg, err := UpgradeSelf(srv.Client(), "xeaser/squad-opencode", "0.2.1")
+	msg, err := UpgradeSelf(srv.Client(), version.Repo, "0.2.1")
 	if err != nil {
 		t.Fatal(err)
 	}
