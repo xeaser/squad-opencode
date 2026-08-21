@@ -10,6 +10,12 @@ type Config struct {
 	ExternalPath string `json:"externalPath,omitempty"`
 	// LinkPath, if set, is a remote/shared team directory (link).
 	LinkPath string `json:"linkPath,omitempty"`
+	// LinkURL, if set, is the git remote this project linked (remote link).
+	LinkURL string `json:"linkUrl,omitempty"`
+	// LinkRef is the branch checked out in the links cache (default branch).
+	LinkRef string `json:"linkRef,omitempty"`
+	// LinkSHA is the last fetched commit of LinkRef.
+	LinkSHA string `json:"linkSha,omitempty"`
 	// Theme is an optional display-name theme (e.g. "office"). IDs stay stable.
 	Theme string `json:"theme,omitempty"`
 	// ThemeOrigin is how the theme was set: "init" or "applied".
