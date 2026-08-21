@@ -87,7 +87,7 @@ OpenCode creates `.opencode/package.json` (`@opencode-ai/plugin`) and runs an in
 | `nap [--dry-run] [--deep]` / `scrub-emails [directory]` | Context and PII hygiene |
 | `upstream add <name> <path\|git-url>` / `list` / `remove` / `sync` | Remember and pull extra agents/skills |
 | `pack <path\|git-url>` | One-shot pull of extra agents/skills |
-| `link <team-dir>` / `link --off` | Share one team directory across several repos |
+| `link <team-dir|git-url>` / `link --sync` / `link --off` | Share one team directory across several repos (git URL clones into `~/.squad-oc/links/`) |
 | `update-check [--json] [--refresh]` | Prints `up to date` or `update available` vs GitHub latest tag |
 | `traces [--last N] [--json] [--export file]` | Local `run` / `watch` spans; `--export` writes OTLP JSON |
 | `mcp apply` / `list` / `init` | Merge org `.squad/mcp-config.json` into `opencode.json` |
@@ -170,6 +170,13 @@ squad-oc link ~/teams/platform
 squad-oc status                         # both show the same members
 # later
 squad-oc link --off                     # this repo uses its local .squad/ again
+```
+
+```bash
+# or, no local clone — cache lives in ~/.squad-oc/links/
+squad-oc link https://github.com/acme/squad-platform.git
+squad-oc link --sync                    # fetch updates
+squad-oc link --off
 ```
 
 `link` does not move files. Config stays in each repo; `team.md` / charters / decisions are read from the shared directory. Cannot combine with `externalize` (that *moves* this project's own team out of the worktree).

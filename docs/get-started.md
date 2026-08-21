@@ -178,7 +178,7 @@ The script builds `squad-oc.exe`, inits `D:\xAI\squad-oc-dummy` if needed, start
 - `squad-oc cast --add Designer --role Design` then OpenCode sees `@designer` after recast
 - `squad-oc cast --remove Tester` drops a member and recasts agents
 - `squad-oc import snapshot.json --with-host` restores `.squad/` plus host agents
-- `squad-oc link ~/teams/platform` to share one `.squad/` across repos (`link --off` to detach)
+- `squad-oc link ~/teams/platform` (or a `git@` / `https` URL) to share one `.squad/` (`link --sync` / `link --off`)
 - `squad-oc watch --health` prints the last Ralph snapshot
 - `squad-oc watch --execute --overnight-start 18:00 --overnight-end 08:00`
 - `squad-oc traces` lists local run/watch spans (`--export` writes OTLP JSON)
