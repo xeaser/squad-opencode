@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -730,5 +731,91 @@ func TestPluginInstallListUninstallViaCLI(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(root, ".opencode", "skills", "reflect", "SKILL.md")); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestLinkGitURLViaCLI(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	remote := makeCLITeamRemote(t, "cli-remote")
+
+	root := t.TempDir()
+	prev, _ := os.Getwd()
+	if err := os.Chdir(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(prev) })
+
+	if code := Execute([]string{"init", "--preset", "default", "--description", "svc"}); code != 0 {
+		t.Fatal("init")
+	}
+	if code := Execute([]string{"link", remote}); code != 0 {
+		t.Fatal("link url")
+	}
+	if squad.Detect(root).Config.LinkURL != remote {
+		t.Fatal("config")
+	}
+	if code := Execute([]string{"status"}); code != 0 {
+		t.Fatal("status")
+	}
+	if code := Execute([]string{"link", "--sync"}); code != 0 {
+		t.Fatal("sync")
+	}
+	if code := Execute([]string{"link", "--off"}); code != 0 {
+		t.Fatal("off")
+	}
+	if squad.Detect(root).Config.LinkPath != "" {
+		t.Fatal("still linked")
+	}
+	if code := Execute([]string{"link", remote}); code != 0 {
+		t.Fatal("re-link")
+	}
+}
+
+func TestLinkSyncWithoutRemoteIsError(t *testing.T) {
+	root := t.TempDir()
+	prev, _ := os.Getwd()
+	if err := os.Chdir(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(prev) })
+	if code := Execute([]string{"init", "--preset", "default"}); code != 0 {
+		t.Fatal("init")
+	}
+	if code := Execute([]string{"link", "--sync"}); code == 0 {
+		t.Fatal("expected error")
+	}
+}
+
+func makeCLITeamRemote(t *testing.T, desc string) string {
+	t.Helper()
+	work := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: work, ProjectDescription: desc}); err != nil {
+		t.Fatal(err)
+	}
+	runCLIGit(t, work, "init")
+	runCLIGit(t, work, "config", "user.email", "test@example.com")
+	runCLIGit(t, work, "config", "user.name", "test")
+	runCLIGit(t, work, "add", ".")
+	runCLIGit(t, work, "commit", "-m", "team")
+	remote := filepath.Join(t.TempDir(), "platform.git")
+	runCLIGit(t, work, "clone", "--bare", work, remote)
+	return remote
+}
+
+func runCLIGit(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(),
+		"GIT_AUTHOR_NAME=test",
+		"GIT_AUTHOR_EMAIL=test@example.com",
+		"GIT_COMMITTER_NAME=test",
+		"GIT_COMMITTER_EMAIL=test@example.com",
+	)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, out)
 	}
 }
