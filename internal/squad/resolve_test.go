@@ -100,3 +100,65 @@ func TestExternalizeRejectedWhenLinked(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestSetLinkClearsRemoteFields(t *testing.T) {
+	root := t.TempDir()
+	other := t.TempDir()
+	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: other, ProjectDescription: "shared"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := SetRemoteLink(root, SquadDir(other), "https://example.com/team.git", "main", "abc123"); err != nil {
+		t.Fatal(err)
+	}
+	if err := SetLink(root, SquadDir(other)); err != nil {
+		t.Fatal(err)
+	}
+	cfg := Detect(root).Config
+	if cfg.LinkURL != "" || cfg.LinkRef != "" || cfg.LinkSHA != "" {
+		t.Fatalf("path link must drop remote fields: %+v", cfg)
+	}
+	if cfg.LinkPath != SquadDir(other) {
+		t.Fatal(cfg.LinkPath)
+	}
+}
+
+func TestClearLinkDropsRemoteFields(t *testing.T) {
+	root := t.TempDir()
+	other := t.TempDir()
+	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: other}); err != nil {
+		t.Fatal(err)
+	}
+	if err := SetRemoteLink(root, SquadDir(other), "git@example.com:acme/team.git", "main", "def456"); err != nil {
+		t.Fatal(err)
+	}
+	if err := ClearLink(root); err != nil {
+		t.Fatal(err)
+	}
+	cfg := Detect(root).Config
+	if cfg.LinkPath != "" || cfg.LinkURL != "" || cfg.LinkRef != "" || cfg.LinkSHA != "" {
+		t.Fatalf("unlink must clear remote: %+v", cfg)
+	}
+}
+
+func TestSetRemoteLinkRejectedWhenExternalized(t *testing.T) {
+	root := t.TempDir()
+	other := t.TempDir()
+	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: other}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ExternalizeTo(root, filepath.Join(t.TempDir(), "ext")); err != nil {
+		t.Fatal(err)
+	}
+	if err := SetRemoteLink(root, SquadDir(other), "https://example.com/team.git", "main", "abc"); err == nil {
+		t.Fatal("expected error")
+	}
+}

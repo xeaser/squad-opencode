@@ -121,7 +121,8 @@ Commands:
   upstream add <name> <path|git-url>
   upstream list | remove <name> | sync <name>
   pack <path|git-url>
-  link <team-dir>
+  link <team-dir|git-url>
+  link --sync
   link --off
   update-check [--json] [--refresh]
   traces [--last N] [--json] [--export file]
@@ -864,19 +865,31 @@ func cmdPack(args []string) int {
 
 func cmdLink(args []string) int {
 	if len(args) < 1 {
-		fmt.Fprintln(os.Stderr, "link <team-directory> | link --off")
+		fmt.Fprintln(os.Stderr, "link <team-directory|git-url> | link --sync | link --off")
 		return 2
 	}
 	root, code := cwd()
 	if code != 0 {
 		return code
 	}
-	if args[0] == "--off" {
+	switch args[0] {
+	case "--help", "-h":
+		printHelp()
+		return 0
+	case "--off":
 		if err := share.Unlink(root); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return 1
 		}
 		fmt.Println("unlinked")
+		return 0
+	case "--sync":
+		dest, err := share.SyncLink(root)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		fmt.Println("synced →", dest)
 		return 0
 	}
 	dest, err := share.Link(root, args[0])

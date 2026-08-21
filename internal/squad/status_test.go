@@ -95,3 +95,24 @@ func TestStatusReportNotInitialized(t *testing.T) {
 		t.Fatal("expected error when not initialized")
 	}
 }
+
+func TestStatusReportRemoteLink(t *testing.T) {
+	root := t.TempDir()
+	other := t.TempDir()
+	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: other, ProjectDescription: "shared"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := SetRemoteLink(root, SquadDir(other), "https://example.com/team.git", "main", "abcdef1234567890"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := StatusReport(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(got, "https://example.com/team.git") || !strings.Contains(got, "abcdef1") {
+		t.Fatal(got)
+	}
+}

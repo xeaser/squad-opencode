@@ -2,6 +2,7 @@ package share
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -272,6 +273,244 @@ func TestLink(t *testing.T) {
 	}
 	if squad.Detect(root).Config.LinkPath != "" {
 		t.Fatal("expected unlink")
+	}
+}
+
+func TestLinkGitURL(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+
+	remote := makeShareTeamRemote(t, "shared-remote")
+	root := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	dest, err := Link(root, remote)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := squad.Detect(root).Config
+	if cfg.LinkPath != dest || cfg.LinkURL != remote || cfg.LinkSHA == "" {
+		t.Fatalf("%+v dest=%s", cfg, dest)
+	}
+	if squad.ResolveDir(root) != dest {
+		t.Fatalf("resolve %s want %s", squad.ResolveDir(root), dest)
+	}
+	team, _ := os.ReadFile(filepath.Join(squad.ResolveDir(root), "team.md"))
+	if !strings.Contains(string(team), "shared-remote") {
+		t.Fatalf("linked team: %s", team)
+	}
+}
+
+func TestLinkPathStillWorks(t *testing.T) {
+	root := t.TempDir()
+	other := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: other, ProjectDescription: "path-team"}); err != nil {
+		t.Fatal(err)
+	}
+	dest, err := Link(root, other)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dest != squad.SquadDir(other) {
+		t.Fatal(dest)
+	}
+	if squad.Detect(root).Config.LinkURL != "" {
+		t.Fatal("path link must not set linkUrl")
+	}
+}
+
+func TestLinkGitURLRejectedWhenExternalized(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	remote := makeShareTeamRemote(t, "ext-block")
+	root := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := squad.ExternalizeTo(root, filepath.Join(t.TempDir(), "ext")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Link(root, remote); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestSyncLinkFetches(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+
+	work, remote := makeShareTeamRemotePair(t, "v1")
+	root := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Link(root, remote); err != nil {
+		t.Fatal(err)
+	}
+	sha1 := squad.Detect(root).Config.LinkSHA
+
+	if err := os.WriteFile(filepath.Join(work, ".squad", "decisions.md"), []byte("# Decisions\n\nsynced\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runGit(t, work, "add", ".")
+	runGit(t, work, "commit", "-m", "v2")
+	runGit(t, work, "push", remote, "HEAD:"+shareDefaultBranch(t, work))
+
+	dest, err := SyncLink(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := squad.Detect(root).Config
+	if cfg.LinkSHA == "" || cfg.LinkSHA == sha1 {
+		t.Fatalf("sha %s -> %s", sha1, cfg.LinkSHA)
+	}
+	body, _ := os.ReadFile(filepath.Join(dest, "decisions.md"))
+	if !strings.Contains(string(body), "synced") {
+		t.Fatalf("%s", body)
+	}
+}
+
+func TestSyncLinkRequiresRemote(t *testing.T) {
+	root := t.TempDir()
+	other := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: other}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Link(root, other); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := SyncLink(root); err == nil {
+		t.Fatal("path link has nothing to fetch")
+	}
+}
+
+func TestUnlinkRemoteThenRelink(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	remote := makeShareTeamRemote(t, "again")
+	root := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root, ProjectDescription: "local-app"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Link(root, remote); err != nil {
+		t.Fatal(err)
+	}
+	if err := Unlink(root); err != nil {
+		t.Fatal(err)
+	}
+	cfg := squad.Detect(root).Config
+	if cfg.LinkPath != "" || cfg.LinkURL != "" {
+		t.Fatalf("still linked: %+v", cfg)
+	}
+	local, _ := os.ReadFile(filepath.Join(squad.ResolveDir(root), "team.md"))
+	if !strings.Contains(string(local), "local-app") {
+		t.Fatalf("local team: %s", local)
+	}
+	if _, err := Link(root, remote); err != nil {
+		t.Fatal(err)
+	}
+	if squad.Detect(root).Config.LinkURL != remote {
+		t.Fatal("re-link failed")
+	}
+}
+
+func TestRelinkSameURLFetches(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+
+	work, remote := makeShareTeamRemotePair(t, "v1")
+	root := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Link(root, remote); err != nil {
+		t.Fatal(err)
+	}
+	sha1 := squad.Detect(root).Config.LinkSHA
+
+	if err := os.WriteFile(filepath.Join(work, ".squad", "decisions.md"), []byte("# Decisions\n\nsynced\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runGit(t, work, "add", ".")
+	runGit(t, work, "commit", "-m", "v2")
+	runGit(t, work, "push", remote, "HEAD:"+shareDefaultBranch(t, work))
+
+	dest, err := Link(root, remote)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := squad.Detect(root).Config
+	if cfg.LinkSHA == "" || cfg.LinkSHA == sha1 {
+		t.Fatalf("sha %s -> %s", sha1, cfg.LinkSHA)
+	}
+	body, _ := os.ReadFile(filepath.Join(dest, "decisions.md"))
+	if !strings.Contains(string(body), "synced") {
+		t.Fatalf("%s", body)
+	}
+}
+
+func makeShareTeamRemote(t *testing.T, desc string) string {
+	t.Helper()
+	_, remote := makeShareTeamRemotePair(t, desc)
+	return remote
+}
+
+func makeShareTeamRemotePair(t *testing.T, desc string) (work, remote string) {
+	t.Helper()
+	work = t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: work, ProjectDescription: desc}); err != nil {
+		t.Fatal(err)
+	}
+	runGit(t, work, "init")
+	runGit(t, work, "config", "user.email", "test@example.com")
+	runGit(t, work, "config", "user.name", "test")
+	runGit(t, work, "add", ".")
+	runGit(t, work, "commit", "-m", "team")
+	remote = filepath.Join(t.TempDir(), "platform.git")
+	runGit(t, work, "clone", "--bare", work, remote)
+	return work, remote
+}
+
+func shareDefaultBranch(t *testing.T, repo string) string {
+	t.Helper()
+	cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+	cmd.Dir = repo
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("default branch: %v\n%s", err, out)
+	}
+	b := strings.TrimSpace(string(out))
+	if b == "" || b == "HEAD" {
+		t.Fatalf("default branch: %q", b)
+	}
+	return b
+}
+
+func runGit(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(),
+		"GIT_AUTHOR_NAME=test",
+		"GIT_AUTHOR_EMAIL=test@example.com",
+		"GIT_COMMITTER_NAME=test",
+		"GIT_COMMITTER_EMAIL=test@example.com",
+	)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, out)
 	}
 }
 

@@ -18,6 +18,15 @@ func GlobalSquadDir() (string, error) {
 	return filepath.Join(home, ".squad-oc", "global"), nil
 }
 
+// LinksCacheDir is ~/.squad-oc/links (cloned remote teams).
+func LinksCacheDir() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".squad-oc", "links"), nil
+}
+
 func ConfigPath(projectRoot string) string {
 	return filepath.Join(SquadDir(projectRoot), "config.json")
 }

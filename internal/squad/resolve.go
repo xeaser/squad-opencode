@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // ResolveDir returns the directory that holds live team state.
@@ -60,6 +61,9 @@ func SetLink(projectRoot, teamDir string) error {
 		next = *cfg
 	}
 	next.LinkPath = absClean(teamDir)
+	next.LinkURL = ""
+	next.LinkRef = ""
+	next.LinkSHA = ""
 	return SaveConfig(projectRoot, next)
 }
 
@@ -73,7 +77,36 @@ func ClearLink(projectRoot string) error {
 		return fmt.Errorf("not linked")
 	}
 	cfg.LinkPath = ""
+	cfg.LinkURL = ""
+	cfg.LinkRef = ""
+	cfg.LinkSHA = ""
 	return SaveConfig(projectRoot, *cfg)
+}
+
+// SetRemoteLink points this project at a cached checkout and records the remote.
+func SetRemoteLink(projectRoot, teamDir, url, ref, sha string) error {
+	if !IsInitialized(projectRoot) {
+		return fmt.Errorf("not initialized")
+	}
+	cfg := Detect(projectRoot).Config
+	if cfg != nil && cfg.ExternalPath != "" {
+		return fmt.Errorf("already externalized at %s — internalize first", cfg.ExternalPath)
+	}
+	if _, err := os.Stat(filepath.Join(teamDir, "team.md")); err != nil {
+		return fmt.Errorf("team path must contain team.md")
+	}
+	if strings.TrimSpace(url) == "" {
+		return fmt.Errorf("git url required")
+	}
+	next := Config{Version: 1, Host: "opencode", Preset: "default"}
+	if cfg != nil {
+		next = *cfg
+	}
+	next.LinkPath = absClean(teamDir)
+	next.LinkURL = strings.TrimSpace(url)
+	next.LinkRef = strings.TrimSpace(ref)
+	next.LinkSHA = strings.TrimSpace(sha)
+	return SaveConfig(projectRoot, next)
 }
 
 func fileExists(path string) bool {

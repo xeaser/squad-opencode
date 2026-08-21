@@ -32,6 +32,16 @@ func StatusReport(root string) (string, error) {
 		if det.Config.LinkPath != "" {
 			fmt.Fprintf(&b, "Link: %s\n", det.Config.LinkPath)
 		}
+		if det.Config.LinkURL != "" {
+			fmt.Fprintf(&b, "Link URL: %s\n", det.Config.LinkURL)
+			sha := det.Config.LinkSHA
+			if len(sha) > 7 {
+				sha = sha[:7]
+			}
+			if det.Config.LinkRef != "" && sha != "" {
+				fmt.Fprintf(&b, "Link rev: %s @ %s\n", det.Config.LinkRef, sha)
+			}
+		}
 	}
 	b.WriteByte('\n')
 	if len(members) == 0 {
