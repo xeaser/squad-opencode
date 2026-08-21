@@ -324,3 +324,22 @@ func Link(projectRoot, teamPath string) (string, error) {
 func Unlink(projectRoot string) error {
 	return squad.ClearLink(projectRoot)
 }
+
+// SyncLink fetches updates for a git-linked team.
+func SyncLink(projectRoot string) (string, error) {
+	if !squad.IsInitialized(projectRoot) {
+		return "", fmt.Errorf("not initialized")
+	}
+	cfg := squad.Detect(projectRoot).Config
+	if cfg == nil || cfg.LinkURL == "" {
+		return "", fmt.Errorf("not a remote link — link a git URL first")
+	}
+	dest, ref, sha, err := squad.SyncRemoteCheckout(cfg.LinkURL, cfg.LinkRef)
+	if err != nil {
+		return "", err
+	}
+	if err := squad.SetRemoteLink(projectRoot, dest, cfg.LinkURL, ref, sha); err != nil {
+		return "", err
+	}
+	return dest, nil
+}
