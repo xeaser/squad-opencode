@@ -70,7 +70,7 @@ Each original-Squad ease row is a **squad-oc command** you already ran, a **late
 
 | Original ease | Mapping |
 |---------------|---------|
-| `npm i -g @bradygaster/squad-cli` | `go build -o squad-oc ./cmd/squad-oc` (put it on `PATH`) |
+| `npm i -g @bradygaster/squad-cli` | GitHub Releases / Scoop / Homebrew / winget (put `squad-oc` on `PATH`) |
 | `squad init` / `npx squad init` | `squad-oc init --preset default` |
 | `squad init` with a blurb | `squad-oc init --preset default --description "…"` |
 | Personal / global team | `squad-oc init --global` |

@@ -11,7 +11,6 @@ Zero to first team. You do **not** need GitHub Copilot, Node, or the original Sq
 | Need | Why |
 |------|-----|
 | Terminal | Install and run tools |
-| **Go 1.26.6+** (to build `squad-oc`) | Or a prebuilt binary when published |
 | Git | Project + recommended for real work |
 | An LLM provider | OpenCode talks to a model |
 
@@ -69,16 +68,31 @@ git commit -m "chore: initial commit"
 
 ---
 
-## 4. Build and install `squad-oc`
+## 4. Install `squad-oc`
 
-From this repository:
+You do **not** need Go. Download the archive for your OS from [GitHub Releases](https://github.com/xeaser/squad-opencode/releases/latest) and put `squad-oc` (`squad-oc.exe` on Windows) on your `PATH`. Assets are `squad-oc_<version>_<os>_<arch>.zip` (Windows) or `.tar.gz` (macOS/Linux).
 
-```bash
-cd /path/to/squad-opencode
-go build -o squad-oc ./cmd/squad-oc
+**Scoop**
+
+```powershell
+scoop bucket add squad https://github.com/xeaser/squad-opencode
+scoop install squad-oc
 ```
 
-Put the binary on your `PATH`, or call it with a full path.
+**Homebrew**
+
+```bash
+brew tap xeaser/squad-opencode https://github.com/xeaser/squad-opencode
+brew install squad-oc
+```
+
+**winget** (from a clone of this repo)
+
+```powershell
+winget install --manifest packaging/winget
+```
+
+Update later with `squad-oc upgrade --self`.
 
 Check:
 
@@ -121,7 +135,6 @@ To refresh OpenCode agents/skills after a `squad-oc` update (team files stay put
 ```bash
 squad-oc upgrade --dry-run
 squad-oc upgrade
-squad-oc upgrade --self
 ```
 
 Validate:
@@ -252,7 +265,7 @@ squad-oc status
 | No **squad** agent | `squad-oc init --preset default` in project root |
 | `Not initialized` | `squad-oc init --preset default` |
 | Server probe FAIL only | Soft check — run `opencode serve` for the HTTP API on :4096 |
-| Build fails | `go version` ≥ 1.26.6; `go mod tidy` |
+| `squad-oc: command not found` | Download a release binary; fix PATH |
 
 ---
 

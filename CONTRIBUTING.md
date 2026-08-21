@@ -50,6 +50,7 @@ Do not force-push to the default branch. Do not rewrite published tags.
    ```
 
 4. The release workflow checks the tag is on `origin/main`, waits for `ci`, then GoReleaser publishes.
+5. Refresh `Formula/squad-oc.rb`, `bucket/squad-oc.json`, and `packaging/winget/` from that tag's `checksums.txt` so package managers pin the new assets.
 
 `go build` (and CI's compile job) report `dev`. GoReleaser injects the tag into `version.Version`, so `squad-oc version` on a release binary matches the tag. Do not edit `internal/version/version.go` to bump the version.
 

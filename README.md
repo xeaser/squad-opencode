@@ -10,20 +10,36 @@ One binary scaffolds a persistent team in your repo (`.squad/`) and OpenCode age
 > Inspired by [bradygaster/squad](https://github.com/bradygaster/squad) (MIT). OpenCode-native port — not a Copilot fork.  
 > Host API client: official [opencode-sdk-go](https://github.com/anomalyco/opencode-sdk-go) (`github.com/sst/opencode-sdk-go`).
 
+## Install
+
+No Go toolchain. Download the archive for your OS from [GitHub Releases](https://github.com/xeaser/squad-opencode/releases/latest) and put `squad-oc` on your `PATH`. Assets are `squad-oc_<version>_<os>_<arch>.zip` (Windows) or `.tar.gz` (macOS/Linux).
+
+```bash
+# Scoop
+scoop bucket add squad https://github.com/xeaser/squad-opencode
+scoop install squad-oc
+
+# Homebrew
+brew tap xeaser/squad-opencode https://github.com/xeaser/squad-opencode
+brew install squad-oc
+
+# winget (from a clone of this repo)
+winget install --manifest packaging/winget
+```
+
+`squad-oc upgrade --self` replaces the binary from the latest release.
+
 ## Quick start
 
 ```bash
 # 1. Install OpenCode + /connect a provider — https://opencode.ai/docs/
 
-# 2. Build squad-oc
-git clone <this-repo> && cd squad-opencode
-go build -o squad-oc ./cmd/squad-oc
-# optional: move squad-oc onto your PATH
+# 2. Install squad-oc from GitHub Releases (see Install above)
 
 # 3. In your project
 mkdir my-app && cd my-app && git init
-/path/to/squad-oc init --preset default
-/path/to/squad-oc doctor
+squad-oc init --preset default
+squad-oc doctor
 
 # Interactive TUI (does not listen on :4096)
 opencode
