@@ -32,7 +32,6 @@ Modeled on [Tamir's original-Squad workshop](https://github.com/tamirdresher/squ
 | Need | Why |
 |------|-----|
 | Terminal | Run tools |
-| **Go 1.26.6+** (to build `squad-oc`) | Or a prebuilt binary when published |
 | Git | Project + recommended for real work |
 | [OpenCode](https://opencode.ai) | Host TUI and `opencode serve` |
 | An LLM provider | OpenCode talks to a model |
@@ -74,16 +73,24 @@ Inside OpenCode:
 3. Paste your API key
 4. Quit when done
 
-### Build `squad-oc` and put it on `PATH`
+### Install `squad-oc` and put it on `PATH`
 
-From this repository:
+You do **not** need Go. Download the archive for your OS from [GitHub Releases](https://github.com/xeaser/squad-opencode/releases/latest) and put `squad-oc` (`squad-oc.exe` on Windows) on your `PATH`. Assets are `squad-oc_<version>_<os>_<arch>.zip` (Windows) or `.tar.gz` (macOS/Linux).
 
 ```bash
-cd /path/to/squad-opencode
-go build -o squad-oc ./cmd/squad-oc
+# Scoop
+scoop bucket add squad https://github.com/xeaser/squad-opencode
+scoop install squad-oc
+
+# Homebrew
+brew tap xeaser/squad-opencode https://github.com/xeaser/squad-opencode
+brew install squad-oc
+
+# winget (from a clone of this repo)
+winget install --manifest packaging/winget
 ```
 
-Put the binary on your `PATH`, or call it with a full path. On Windows the file is `squad-oc.exe`.
+Later: `squad-oc upgrade --self`.
 
 ### Try it
 
@@ -671,7 +678,7 @@ Each original ease row is a **squad-oc command** you already ran, a **later** co
 
 | Original ease | squad-oc |
 |---------------|----------|
-| `npm i -g @bradygaster/squad-cli` | `go build` / put `squad-oc` on `PATH` |
+| `npm i -g @bradygaster/squad-cli` | GitHub Releases / Scoop / Homebrew / winget |
 | `squad init` | `squad-oc init --preset default` |
 | `copilot --agent squad` | `opencode` → Tab → **squad** |
 | `squad status` | `squad-oc status` |
@@ -696,7 +703,7 @@ Each original ease row is a **squad-oc command** you already ran, a **later** co
 
 | Problem | Try |
 |---------|-----|
-| `squad-oc: command not found` | Build from this repo; fix `PATH` |
+| `squad-oc: command not found` | Install from GitHub Releases; fix `PATH` |
 | `opencode: command not found` | Install OpenCode; fix `PATH` |
 | No **squad** agent | `squad-oc init --preset default` in the project root |
 | `Not initialized` | `squad-oc init --preset default` |
