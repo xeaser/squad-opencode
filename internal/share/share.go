@@ -300,13 +300,21 @@ func writeFile(src, dest string) error {
 	return os.WriteFile(dest, data, 0o644)
 }
 
-// Link points this project at a shared team (project root or .squad dir).
+// Link points this project at a shared team (local path or git URL).
 func Link(projectRoot, teamPath string) (string, error) {
-	dest, err := squad.ResolveLinkTarget(teamPath)
+	if dest, err := squad.ResolveLinkTarget(teamPath); err == nil {
+		if err := squad.SetLink(projectRoot, dest); err != nil {
+			return "", err
+		}
+		return dest, nil
+	} else if !squad.LooksLikeGit(teamPath) {
+		return "", err
+	}
+	dest, ref, sha, err := squad.EnsureRemoteCheckout(teamPath)
 	if err != nil {
 		return "", err
 	}
-	if err := squad.SetLink(projectRoot, dest); err != nil {
+	if err := squad.SetRemoteLink(projectRoot, dest, teamPath, ref, sha); err != nil {
 		return "", err
 	}
 	return dest, nil
