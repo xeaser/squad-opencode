@@ -8,6 +8,18 @@ import (
 	"testing"
 )
 
+func TestApplyThemeToCharterTitlePreservesCRLF(t *testing.T) {
+	original := "# Lead\r\n\r\n## Mission\r\n"
+	office := applyThemeToCharterTitle(original, "Michael")
+	if office != "# Michael\r\n\r\n## Mission\r\n" {
+		t.Fatalf("office:\n%q", office)
+	}
+	restored := applyThemeToCharterTitle(office, "Lead")
+	if restored != original {
+		t.Fatalf("restored:\n%q want %q", restored, original)
+	}
+}
+
 func TestApplyThemeToTeamMarkdownInvertible(t *testing.T) {
 	raw, err := os.ReadFile("templates/squad/team.md")
 	if err != nil {
@@ -79,7 +91,7 @@ func TestApplyThemeOfficeThenNone(t *testing.T) {
 		t.Fatalf("How to work should list @michael not @lead:\n%s", officeTeam)
 	}
 	leadCharter, _ := os.ReadFile(filepath.Join(root, ".squad", "agents", "lead", "charter.md"))
-	if !strings.HasPrefix(string(leadCharter), "# Michael\n") {
+	if !strings.HasPrefix(strings.ReplaceAll(string(leadCharter), "\r\n", "\n"), "# Michael\n") {
 		t.Fatalf("charter title:\n%s", leadCharter)
 	}
 
@@ -216,7 +228,7 @@ func TestApplyThemeNoneAfterInitOrigin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasPrefix(string(lead), "# Lead\n") {
+	if !strings.HasPrefix(strings.ReplaceAll(string(lead), "\r\n", "\n"), "# Lead\n") {
 		t.Fatalf("charter title:\n%s", lead)
 	}
 	if strings.Contains(string(lead), ".squad/agents/michael/") {

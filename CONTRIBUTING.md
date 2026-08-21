@@ -31,7 +31,7 @@ That talks to `opencode serve` on `127.0.0.1:4096`. The TUI (`opencode`) is not 
 
 1. Branch from the default branch: `feat/…` or `fix/…`.
 2. One logical change per PR. Match existing Go style (small packages, table tests, temp dirs).
-3. `gofmt`, `go vet ./...`, and `go test ./...` must pass. CI also runs race tests, golangci-lint, govulncheck, and a build on Linux/Windows/macOS.
+3. `gofmt`, `go vet ./...`, and `go test ./...` must pass. CI also runs race tests on Linux/Windows/macOS, golangci-lint, govulncheck, actionlint, and a build on all three OSes.
 4. Update README / get-started if you add a user-visible command or flag.
 5. Open a PR. Wait for the `ci` check (lint + test + vuln + build) and one review.
 

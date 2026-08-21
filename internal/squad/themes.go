@@ -257,7 +257,11 @@ func applyThemeToCharterTitle(content, title string) string {
 		trim := strings.TrimSpace(strings.TrimSuffix(line, "\r"))
 		if strings.HasPrefix(trim, "# ") && !strings.HasPrefix(trim, "##") {
 			prefix := line[:len(line)-len(strings.TrimLeft(line, " \t"))]
-			lines[i] = prefix + "# " + title
+			eol := ""
+			if strings.HasSuffix(line, "\r") {
+				eol = "\r"
+			}
+			lines[i] = prefix + "# " + title + eol
 			break
 		}
 	}
