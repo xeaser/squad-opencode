@@ -143,8 +143,11 @@ func TestReleaseWorkflowOpensOnePackagingPR(t *testing.T) {
 	if !strings.Contains(s, "auto-merge not enabled") && !strings.Contains(s, "::warning::") {
 		t.Error("packaging-bump must warn, not fail, when auto-merge is unavailable")
 	}
-	if !strings.Contains(s, "releases/latest") && !strings.Contains(s, "not the latest") {
-		t.Error("packaging-bump must skip when the tag is not the latest GitHub Release")
+	if !strings.Contains(s, "sort=-v:refname") {
+		t.Error("packaging-bump must compare semver tags, not GitHub latest (newest-created)")
+	}
+	if !strings.Contains(s, "could not push packaging") && !strings.Contains(s, "push denied") {
+		t.Error("packaging-bump must warn, not fail the release, if the bump token cannot push")
 	}
 }
 

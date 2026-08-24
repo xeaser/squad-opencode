@@ -139,9 +139,10 @@ jobs:
           TAG: ${{ env.RELEASE_TAG }}
         run: |
           set -euo pipefail
-          latest=$(gh release view --json tagName --jq .tagName)
-          if [ "${TAG}" != "${latest}" ]; then
-            echo "tag ${TAG} is not the latest GitHub Release (${latest}); skip packaging pin"
+          git fetch --tags origin
+          newest=$(git tag --list 'v*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)
+          if [ "${TAG}" != "${newest}" ]; then
+            echo "tag ${TAG} is not the newest stable tag (${newest}); skip packaging pin"
             exit 0
           fi
           branch="chore/packaging-${TAG}"
@@ -156,7 +157,10 @@ jobs:
             exit 0
           fi
           git commit -m "chore: pin Homebrew, Scoop, and winget to ${TAG}"
-          git push -u origin "${branch}" --force
+          if ! git push -u origin "${branch}" --force; then
+            echo "::warning::could not push packaging branch (PACKAGING_BUMP_TOKEN push denied); release is published"
+            exit 0
+          fi
           pr=$(gh pr list --head "${branch}" --json number --jq '.[0].number')
           if [ -z "${pr}" ] || [ "${pr}" = "null" ]; then
             gh pr create --base main --head "${branch}" \
