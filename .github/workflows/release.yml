@@ -43,7 +43,10 @@ jobs:
       - name: Require previous stable tag has a GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bash scripts/require-previous-release.sh "${RELEASE_TAG}"
+        run: |
+          git fetch origin main
+          git show origin/main:scripts/require-previous-release.sh > "${RUNNER_TEMP}/require-previous-release.sh"
+          bash "${RUNNER_TEMP}/require-previous-release.sh" "${RELEASE_TAG}"
       - name: Wait for ci on tagged commit
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
