@@ -164,3 +164,7 @@ Live OpenCode HTTP checks need a running `opencode serve` and use the `live` bui
 `cmd/squad-oc` is a thin main. Command handling lives in `internal/cli`. Team files and templates are `internal/squad`. OpenCode HTTP is `internal/opencodeclient`. GitHub issue triage is `internal/watch`.
 
 See README.md and docs/get-started.md.
+
+## Docs
+
+`docs/` is product and domain only (`get-started`, `workshop`, `use-cases`). Agent specs, plans, and SDD scratch stay in gitignored `.superpowers/`. Do not write brainstorm or design docs under `docs/superpowers/`.
