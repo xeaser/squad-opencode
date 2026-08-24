@@ -116,3 +116,24 @@ func TestStatusReportRemoteLink(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+func TestStatusReportRemoteLinkSHAWithoutRef(t *testing.T) {
+	root := t.TempDir()
+	other := t.TempDir()
+	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: other, ProjectDescription: "shared"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := SetRemoteLink(root, SquadDir(other), "https://example.com/team.git", "", "abcdef1234567890"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := StatusReport(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(got, "Link rev: abcdef1") {
+		t.Fatalf("expected SHA when LinkRef is empty:\n%s", got)
+	}
+}

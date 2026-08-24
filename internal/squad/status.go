@@ -38,8 +38,12 @@ func StatusReport(root string) (string, error) {
 			if len(sha) > 7 {
 				sha = sha[:7]
 			}
-			if det.Config.LinkRef != "" && sha != "" {
-				fmt.Fprintf(&b, "Link rev: %s @ %s\n", det.Config.LinkRef, sha)
+			if sha != "" {
+				if det.Config.LinkRef != "" {
+					fmt.Fprintf(&b, "Link rev: %s @ %s\n", det.Config.LinkRef, sha)
+				} else {
+					fmt.Fprintf(&b, "Link rev: %s\n", sha)
+				}
 			}
 		}
 	}

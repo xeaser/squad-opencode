@@ -123,11 +123,7 @@ var CloneGit = func(url, dest string) error {
 }
 
 func looksLikeGit(s string) bool {
-	s = strings.TrimSpace(s)
-	if strings.Contains(s, "://") || strings.HasPrefix(s, "git@") {
-		return true
-	}
-	return strings.HasSuffix(s, ".git")
+	return squad.LooksLikeGit(s)
 }
 
 // ApplySource copies .opencode host files from src, then any new .squad snippets.
@@ -309,6 +305,12 @@ func Link(projectRoot, teamPath string) (string, error) {
 		return dest, nil
 	} else if !squad.LooksLikeGit(teamPath) {
 		return "", err
+	}
+	if !squad.IsInitialized(projectRoot) {
+		return "", fmt.Errorf("not initialized")
+	}
+	if cfg := squad.Detect(projectRoot).Config; cfg != nil && cfg.ExternalPath != "" {
+		return "", fmt.Errorf("already externalized at %s — internalize first", cfg.ExternalPath)
 	}
 	dest, ref, sha, err := squad.EnsureRemoteCheckout(teamPath)
 	if err != nil {

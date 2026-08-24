@@ -339,6 +339,36 @@ func TestLinkGitURLRejectedWhenExternalized(t *testing.T) {
 	if _, err := Link(root, remote); err == nil {
 		t.Fatal("expected error")
 	}
+	assertNoLinkCache(t)
+}
+
+func TestLinkGitURLRejectedWhenNotInitialized(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	remote := makeShareTeamRemote(t, "uninit-block")
+	if _, err := Link(t.TempDir(), remote); err == nil {
+		t.Fatal("expected error")
+	}
+	assertNoLinkCache(t)
+}
+
+func assertNoLinkCache(t *testing.T) {
+	t.Helper()
+	cache, err := squad.LinksCacheDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries, err := os.ReadDir(cache)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return
+		}
+		t.Fatal(err)
+	}
+	if len(entries) > 0 {
+		t.Fatalf("cloned before reject: %s", entries[0].Name())
+	}
 }
 
 func TestSyncLinkFetches(t *testing.T) {
