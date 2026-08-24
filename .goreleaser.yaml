@@ -45,7 +45,7 @@ homebrew_casks:
     skip_upload: auto
     repository:
       owner: "{{ .Env.GITHUB_REPOSITORY_OWNER }}"
-      name: '{{ trimPrefix (print .Env.GITHUB_REPOSITORY_OWNER "/") .Env.GITHUB_REPOSITORY }}'
+      name: '{{ trimprefix .Env.GITHUB_REPOSITORY (print .Env.GITHUB_REPOSITORY_OWNER "/") }}'
 
 scoops:
   - name: squad-oc
@@ -55,7 +55,7 @@ scoops:
     skip_upload: auto
     repository:
       owner: "{{ .Env.GITHUB_REPOSITORY_OWNER }}"
-      name: '{{ trimPrefix (print .Env.GITHUB_REPOSITORY_OWNER "/") .Env.GITHUB_REPOSITORY }}'
+      name: '{{ trimprefix .Env.GITHUB_REPOSITORY (print .Env.GITHUB_REPOSITORY_OWNER "/") }}'
 
 winget:
   - name: squad-oc
@@ -74,4 +74,4 @@ winget:
       - squad
     repository:
       owner: "{{ .Env.GITHUB_REPOSITORY_OWNER }}"
-      name: '{{ trimPrefix (print .Env.GITHUB_REPOSITORY_OWNER "/") .Env.GITHUB_REPOSITORY }}'
+      name: '{{ trimprefix .Env.GITHUB_REPOSITORY (print .Env.GITHUB_REPOSITORY_OWNER "/") }}'
