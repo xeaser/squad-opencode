@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.singleton.1.6.0.schema.json
 PackageIdentifier: xeaser.squad-oc
-PackageVersion: 0.4.0
+PackageVersion: 0.5.0
 PackageLocale: en-US
 Publisher: xeaser
 PublisherUrl: https://github.com/xeaser
@@ -13,7 +13,7 @@ Moniker: squad-oc
 Tags:
   - opencode
   - squad
-ReleaseNotesUrl: https://github.com/xeaser/squad-opencode/releases/tag/v0.4.0
+ReleaseNotesUrl: https://github.com/xeaser/squad-opencode/releases/tag/v0.5.0
 Installers:
   - Architecture: x64
     InstallerType: zip
@@ -21,7 +21,7 @@ Installers:
     NestedInstallerFiles:
       - RelativeFilePath: squad-oc.exe
         PortableCommandAlias: squad-oc
-    InstallerUrl: https://github.com/xeaser/squad-opencode/releases/download/v0.4.0/squad-oc_0.4.0_windows_amd64.zip
-    InstallerSha256: 7EFFFA39F33820DB229CF5A7A2B1A5FF887B83B0C55DF0553625AA0ECD5CC0D8
+    InstallerUrl: https://github.com/xeaser/squad-opencode/releases/download/v0.5.0/squad-oc_0.5.0_windows_amd64.zip
+    InstallerSha256: D63014EE8EBA6525D803880952F9A61247E2C138FDFB670E1589F2F64F1E2488
 ManifestType: singleton
 ManifestVersion: 1.6.0
