@@ -34,3 +34,44 @@ archives:
 
 checksum:
   name_template: checksums.txt
+
+homebrew_casks:
+  - name: squad-oc
+    homepage: "https://github.com/xeaser/squad-opencode"
+    description: "Human-led AI agent teams for OpenCode"
+    license: MIT
+    binaries:
+      - squad-oc
+    skip_upload: auto
+    repository:
+      owner: "{{ .Env.GITHUB_REPOSITORY_OWNER }}"
+      name: '{{ trimPrefix (print .Env.GITHUB_REPOSITORY_OWNER "/") .Env.GITHUB_REPOSITORY }}'
+
+scoops:
+  - name: squad-oc
+    homepage: "https://github.com/xeaser/squad-opencode"
+    description: "Human-led AI agent teams for OpenCode"
+    license: MIT
+    skip_upload: auto
+    repository:
+      owner: "{{ .Env.GITHUB_REPOSITORY_OWNER }}"
+      name: '{{ trimPrefix (print .Env.GITHUB_REPOSITORY_OWNER "/") .Env.GITHUB_REPOSITORY }}'
+
+winget:
+  - name: squad-oc
+    publisher: xeaser
+    publisher_url: https://github.com/xeaser
+    short_description: "Human-led AI agent teams for OpenCode"
+    license: MIT
+    license_url: https://github.com/xeaser/squad-opencode/blob/main/LICENSE
+    homepage: "https://github.com/xeaser/squad-opencode"
+    package_identifier: xeaser.squad-oc
+    package_name: squad-oc
+    path: packaging/winget
+    skip_upload: auto
+    tags:
+      - opencode
+      - squad
+    repository:
+      owner: "{{ .Env.GITHUB_REPOSITORY_OWNER }}"
+      name: '{{ trimPrefix (print .Env.GITHUB_REPOSITORY_OWNER "/") .Env.GITHUB_REPOSITORY }}'

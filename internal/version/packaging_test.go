@@ -11,10 +11,15 @@ import (
 
 func TestPackagingPinsReleaseRepo(t *testing.T) {
 	root := repoRoot(t)
+	if _, err := os.Stat(filepath.Join(root, "Formula", "squad-oc.rb")); err == nil {
+		t.Fatal("Formula/squad-oc.rb must be removed; tap is a cask")
+	}
 	files := []string{
 		filepath.Join("bucket", "squad-oc.json"),
-		filepath.Join("Formula", "squad-oc.rb"),
+		filepath.Join("Casks", "squad-oc.rb"),
 		filepath.Join("packaging", "winget", "xeaser.squad-oc.yaml"),
+		filepath.Join("packaging", "winget", "xeaser.squad-oc.installer.yaml"),
+		filepath.Join("packaging", "winget", "xeaser.squad-oc.locale.en-US.yaml"),
 	}
 	repoURL := "https://github.com/" + Repo
 	asset := regexp.MustCompile(Name + `_\d+\.\d+\.\d+_(windows_amd64\.zip|darwin_(amd64|arm64)\.tar\.gz|linux_(amd64|arm64)\.tar\.gz)`)
@@ -24,13 +29,19 @@ func TestPackagingPinsReleaseRepo(t *testing.T) {
 			t.Fatalf("%s: %v", rel, err)
 		}
 		s := string(body)
-		if !strings.Contains(s, Repo) {
-			t.Errorf("%s: missing repo %q", rel, Repo)
+		if !strings.Contains(s, Repo) && !strings.Contains(s, "xeaser") {
+			t.Errorf("%s: missing publisher/repo", rel)
 		}
-		if !strings.Contains(s, repoURL) {
+		if rel == filepath.Join("packaging", "winget", "xeaser.squad-oc.yaml") {
+			if !strings.Contains(s, "ManifestType: version") {
+				t.Errorf("%s: want ManifestType version", rel)
+			}
+			continue
+		}
+		if !strings.Contains(s, repoURL) && !strings.Contains(s, Repo) {
 			t.Errorf("%s: missing %s", rel, repoURL)
 		}
-		if !asset.MatchString(s) {
+		if !asset.MatchString(s) && !strings.Contains(rel, "locale") && !strings.Contains(rel, filepath.Join("winget", "xeaser.squad-oc.yaml")) {
 			t.Errorf("%s: missing goreleaser asset name", rel)
 		}
 	}
@@ -55,6 +66,87 @@ func TestPackagingPinsReleaseRepo(t *testing.T) {
 	}
 	if !strings.Contains(scoop.Autoupdate.Hash.URL, Repo+"/releases/download/") || !strings.HasSuffix(scoop.Autoupdate.Hash.URL, "checksums.txt") {
 		t.Fatalf("scoop autoupdate hash url = %q", scoop.Autoupdate.Hash.URL)
+	}
+
+	mig, err := os.ReadFile(filepath.Join(root, "tap_migrations.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var tm map[string]string
+	if err := json.Unmarshal(mig, &tm); err != nil {
+		t.Fatalf("tap_migrations: %v", err)
+	}
+	if tm["squad-oc"] != "squad-oc" {
+		t.Fatalf("tap_migrations squad-oc = %q", tm["squad-oc"])
+	}
+}
+
+func TestGoreleaserGeneratesPackaging(t *testing.T) {
+	root := repoRoot(t)
+	body, err := os.ReadFile(filepath.Join(root, ".goreleaser.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(body)
+	for _, want := range []string{
+		"homebrew_casks:",
+		"scoops:",
+		"winget:",
+		"skip_upload: auto",
+		"package_identifier: xeaser.squad-oc",
+		"GITHUB_REPOSITORY",
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf(".goreleaser.yaml missing %q", want)
+		}
+	}
+	if strings.Contains(s, "directory: Formula") {
+		t.Error("cask must not use Formula/")
+	}
+}
+
+func TestReleaseWorkflowOpensOnePackagingPR(t *testing.T) {
+	root := repoRoot(t)
+	body, err := os.ReadFile(filepath.Join(root, ".github", "workflows", "release.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(body)
+	for _, want := range []string{
+		"packaging-bump:",
+		"needs: [goreleaser]",
+		"PACKAGING_BUMP_TOKEN",
+		"copy-packaging-from-dist.sh",
+		"gh pr merge --squash --auto",
+		"chore/packaging-",
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("release.yml missing %q", want)
+		}
+	}
+	if !strings.Contains(s, "contents: write") || !strings.Contains(s, "pull-requests: write") {
+		t.Error("packaging-bump needs contents + pull-requests")
+	}
+}
+
+func TestCopyPackagingScriptUsesArtifactsJSON(t *testing.T) {
+	root := repoRoot(t)
+	body, err := os.ReadFile(filepath.Join(root, "scripts", "copy-packaging-from-dist.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(body)
+	for _, want := range []string{
+		"artifacts.json",
+		"Homebrew Cask",
+		"Scoop Manifest",
+		"Winget Manifest",
+		`checkver`,
+		"checksums.txt",
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("copy script missing %q", want)
+		}
 	}
 }
 

@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.6.0.schema.json
+PackageIdentifier: xeaser.squad-oc
+PackageVersion: 0.5.0
+PackageLocale: en-US
+Publisher: xeaser
+PublisherUrl: https://github.com/xeaser
+PackageName: squad-oc
+PackageUrl: https://github.com/xeaser/squad-opencode
+License: MIT
+LicenseUrl: https://github.com/xeaser/squad-opencode/blob/main/LICENSE
+ShortDescription: Human-led AI agent teams for OpenCode
+Moniker: squad-oc
+Tags:
+  - opencode
+  - squad
+ReleaseNotesUrl: https://github.com/xeaser/squad-opencode/releases/tag/v0.5.0
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0
