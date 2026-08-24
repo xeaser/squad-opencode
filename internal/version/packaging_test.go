@@ -128,6 +128,9 @@ func TestReleaseWorkflowOpensOnePackagingPR(t *testing.T) {
 		"copy-packaging-from-dist.sh",
 		"gh pr merge --squash --auto",
 		"chore/packaging-",
+		"workflow_dispatch:",
+		"require-previous-release.sh",
+		"origin/main:.goreleaser.yaml",
 	} {
 		if !strings.Contains(s, want) {
 			t.Errorf("release.yml missing %q", want)
@@ -135,6 +138,30 @@ func TestReleaseWorkflowOpensOnePackagingPR(t *testing.T) {
 	}
 	if !strings.Contains(s, "contents: write") || !strings.Contains(s, "pull-requests: write") {
 		t.Error("packaging-bump needs contents + pull-requests")
+	}
+	if !strings.Contains(s, "auto-merge not enabled") && !strings.Contains(s, "::warning::") {
+		t.Error("packaging-bump must warn, not fail, when auto-merge is unavailable")
+	}
+	if !strings.Contains(s, "releases/latest") && !strings.Contains(s, "not the latest") {
+		t.Error("packaging-bump must skip when the tag is not the latest GitHub Release")
+	}
+}
+
+func TestContributingRetrySameUnpublishedTag(t *testing.T) {
+	root := repoRoot(t)
+	body, err := os.ReadFile(filepath.Join(root, "CONTRIBUTING.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(body)
+	for _, want := range []string{
+		"workflow_dispatch",
+		"same tag",
+		"no GitHub Release",
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("CONTRIBUTING.md missing %q", want)
+		}
 	}
 }
 

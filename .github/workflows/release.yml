@@ -4,11 +4,20 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to publish or retry (e.g. v0.5.1)
+        required: true
+        type: string
 
 permissions:
   contents: write
   actions: read
   checks: read
+
+env:
+  RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
 
 jobs:
   goreleaser:
@@ -17,15 +26,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
           fetch-depth: 0
           persist-credentials: false
+      - name: Use default-branch GoReleaser config
+        run: |
+          git fetch origin main
+          git show origin/main:.goreleaser.yaml > "${RUNNER_TEMP}/goreleaser.yaml"
       - name: Require tag commit on origin/main
         run: |
           git fetch origin main
           if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
-            echo "::error::tag ${GITHUB_REF_NAME} (${GITHUB_SHA}) is not on origin/main; refusing to release"
+            echo "::error::tag ${RELEASE_TAG} (${GITHUB_SHA}) is not on origin/main; refusing to release"
             exit 1
           fi
+      - name: Require previous stable tag has a GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/require-previous-release.sh "${RELEASE_TAG}"
       - name: Wait for ci on tagged commit
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -68,7 +86,7 @@ jobs:
         with:
           distribution: goreleaser
           version: "~> v2"
-          args: release --clean
+          args: release --clean --config ${{ runner.temp }}/goreleaser.yaml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Upload dist for packaging bump
@@ -80,7 +98,7 @@ jobs:
 
   packaging-bump:
     needs: [goreleaser]
-    if: ${{ !contains(github.ref_name, '-') }}
+    if: ${{ !contains(github.event.inputs.tag || github.ref_name, '-') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -110,14 +128,19 @@ jobs:
         env:
           DIST: dist
           REPO: ${{ github.repository }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ env.RELEASE_TAG }}
         run: bash scripts/copy-packaging-from-dist.sh
       - name: Open bump PR
         env:
           GH_TOKEN: ${{ secrets.PACKAGING_BUMP_TOKEN }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ env.RELEASE_TAG }}
         run: |
           set -euo pipefail
+          latest=$(gh release view --json tagName --jq .tagName)
+          if [ "${TAG}" != "${latest}" ]; then
+            echo "tag ${TAG} is not the latest GitHub Release (${latest}); skip packaging pin"
+            exit 0
+          fi
           branch="chore/packaging-${TAG}"
           gh auth setup-git
           git config user.name "github-actions[bot]"
@@ -138,4 +161,8 @@ jobs:
               --body "Auto-generated from ${TAG}. Approve to squash-merge when ci is green. Release: https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
             pr=$(gh pr list --head "${branch}" --json number --jq '.[0].number')
           fi
-          gh pr merge --squash --auto "${pr}"
+          if gh pr merge --squash --auto "${pr}"; then
+            echo "auto-merge queued for ${pr}"
+          else
+            echo "::warning::auto-merge not enabled; approve ${pr} when ci is green"
+          fi
