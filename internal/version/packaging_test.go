@@ -92,7 +92,7 @@ func TestGoreleaserGeneratesPackaging(t *testing.T) {
 		"homebrew_casks:",
 		"scoops:",
 		"winget:",
-		"skip_upload: auto",
+		"skip_upload: true",
 		"package_identifier: xeaser.squad-oc",
 		"GITHUB_REPOSITORY",
 	} {
@@ -102,6 +102,9 @@ func TestGoreleaserGeneratesPackaging(t *testing.T) {
 	}
 	if strings.Contains(s, "directory: Formula") {
 		t.Error("cask must not use Formula/")
+	}
+	if strings.Contains(s, "skip_upload: auto") {
+		t.Error("skip_upload: auto still pushes official releases to main; use true")
 	}
 	if strings.Contains(s, "trimPrefix") {
 		t.Error("GoReleaser templates use trimprefix, not Sprig trimPrefix")

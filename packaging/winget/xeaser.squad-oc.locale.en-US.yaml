@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.6.0.schema.json
 PackageIdentifier: xeaser.squad-oc
-PackageVersion: 0.5.0
+PackageVersion: 0.5.2
 PackageLocale: en-US
 Publisher: xeaser
 PublisherUrl: https://github.com/xeaser
@@ -13,6 +13,6 @@ Moniker: squad-oc
 Tags:
   - opencode
   - squad
-ReleaseNotesUrl: https://github.com/xeaser/squad-opencode/releases/tag/v0.5.0
+ReleaseNotesUrl: https://github.com/xeaser/squad-opencode/releases/tag/v0.5.2
 ManifestType: defaultLocale
 ManifestVersion: 1.6.0

@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.6.0.schema.json
 PackageIdentifier: xeaser.squad-oc
-PackageVersion: 0.5.0
+PackageVersion: 0.5.2
 InstallerLocale: en-US
 InstallerType: zip
 NestedInstallerType: portable
@@ -10,7 +10,7 @@ NestedInstallerFiles:
 ReleaseDate: 2026-08-24
 Installers:
   - Architecture: x64
-    InstallerUrl: https://github.com/xeaser/squad-opencode/releases/download/v0.5.0/squad-oc_0.5.0_windows_amd64.zip
-    InstallerSha256: D63014EE8EBA6525D803880952F9A61247E2C138FDFB670E1589F2F64F1E2488
+    InstallerUrl: https://github.com/xeaser/squad-opencode/releases/download/v0.5.2/squad-oc_0.5.2_windows_amd64.zip
+    InstallerSha256: 611A9FAECB4B3A74DDD1E2A594E88A48CEDDD4C4811FD7A2D484D1B414DE645A
 ManifestType: installer
 ManifestVersion: 1.6.0

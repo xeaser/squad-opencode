@@ -42,7 +42,7 @@ homebrew_casks:
     license: MIT
     binaries:
       - squad-oc
-    skip_upload: auto
+    skip_upload: true
     repository:
       owner: "{{ .Env.GITHUB_REPOSITORY_OWNER }}"
       name: '{{ trimprefix .Env.GITHUB_REPOSITORY (print .Env.GITHUB_REPOSITORY_OWNER "/") }}'
@@ -52,7 +52,7 @@ scoops:
     homepage: "https://github.com/xeaser/squad-opencode"
     description: "Human-led AI agent teams for OpenCode"
     license: MIT
-    skip_upload: auto
+    skip_upload: true
     repository:
       owner: "{{ .Env.GITHUB_REPOSITORY_OWNER }}"
       name: '{{ trimprefix .Env.GITHUB_REPOSITORY (print .Env.GITHUB_REPOSITORY_OWNER "/") }}'
@@ -68,7 +68,7 @@ winget:
     package_identifier: xeaser.squad-oc
     package_name: squad-oc
     path: packaging/winget
-    skip_upload: auto
+    skip_upload: true
     tags:
       - opencode
       - squad
