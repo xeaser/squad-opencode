@@ -103,6 +103,12 @@ func TestGoreleaserGeneratesPackaging(t *testing.T) {
 	if strings.Contains(s, "directory: Formula") {
 		t.Error("cask must not use Formula/")
 	}
+	if strings.Contains(s, "trimPrefix") {
+		t.Error("GoReleaser templates use trimprefix, not Sprig trimPrefix")
+	}
+	if !strings.Contains(s, "trimprefix") {
+		t.Error(".goreleaser.yaml should use trimprefix for the repo name")
+	}
 }
 
 func TestReleaseWorkflowOpensOnePackagingPR(t *testing.T) {
