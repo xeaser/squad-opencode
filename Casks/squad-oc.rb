@@ -3,27 +3,27 @@ cask "squad-oc" do
   name "squad-oc"
   desc "Human-led AI agent teams for OpenCode"
   homepage "https://github.com/xeaser/squad-opencode"
-  version "0.5.0"
+  version "0.5.2"
 
   on_macos do
     on_intel do
-      url "https://github.com/xeaser/squad-opencode/releases/download/v0.5.0/squad-oc_0.5.0_darwin_amd64.tar.gz"
-      sha256 "6005c0a55c65edc9c1a7bdde7cc5ebf4668c5097e36f9febb06b705d90dae254"
+      url "https://github.com/xeaser/squad-opencode/releases/download/v0.5.2/squad-oc_0.5.2_darwin_amd64.tar.gz"
+      sha256 "9ee5e21680357459ad5fcd95862f2e8a1666d8e2756a7908fb39a3eeefa29ea2"
     end
     on_arm do
-      url "https://github.com/xeaser/squad-opencode/releases/download/v0.5.0/squad-oc_0.5.0_darwin_arm64.tar.gz"
-      sha256 "c1deeb0932e3cbaaee08a92c728845301214af322a2dca01c2d455a9f8ef604e"
+      url "https://github.com/xeaser/squad-opencode/releases/download/v0.5.2/squad-oc_0.5.2_darwin_arm64.tar.gz"
+      sha256 "9870a992feb40d06b9bc3d0d64601c9fa39d6101a45c30a98d67105e53ed83ee"
     end
   end
 
   on_linux do
     on_intel do
-      url "https://github.com/xeaser/squad-opencode/releases/download/v0.5.0/squad-oc_0.5.0_linux_amd64.tar.gz"
-      sha256 "94dce0b564c81a6e90b1e367cbdee40cfb29fa43a484fe3ac799e61a34f9c869"
+      url "https://github.com/xeaser/squad-opencode/releases/download/v0.5.2/squad-oc_0.5.2_linux_amd64.tar.gz"
+      sha256 "10cffcc1a42a0b47b84c8990e374ddf51272fee1505e05d8f0da962862873be8"
     end
     on_arm do
-      url "https://github.com/xeaser/squad-opencode/releases/download/v0.5.0/squad-oc_0.5.0_linux_arm64.tar.gz"
-      sha256 "190803966a61fae6a98729e712ff664e38a1e5189c30f40e3031b1ecbb347ad2"
+      url "https://github.com/xeaser/squad-opencode/releases/download/v0.5.2/squad-oc_0.5.2_linux_arm64.tar.gz"
+      sha256 "2d385395865397508d45b713c7d24d421bf91ddabc63ae732354c1c7a017b35e"
     end
   end
 
