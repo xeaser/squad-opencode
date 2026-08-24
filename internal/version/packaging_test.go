@@ -131,6 +131,7 @@ func TestReleaseWorkflowOpensOnePackagingPR(t *testing.T) {
 		"workflow_dispatch:",
 		"require-previous-release.sh",
 		"origin/main:.goreleaser.yaml",
+		"origin/main:scripts/require-previous-release.sh",
 	} {
 		if !strings.Contains(s, want) {
 			t.Errorf("release.yml missing %q", want)
