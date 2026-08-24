@@ -22,6 +22,7 @@ scoop install squad-oc
 # Homebrew
 brew tap xeaser/squad-opencode https://github.com/xeaser/squad-opencode
 brew install squad-oc
+# The tap ships a cask; existing formula installs migrate via tap_migrations.json.
 
 # winget (from a clone of this repo)
 winget install --manifest packaging/winget

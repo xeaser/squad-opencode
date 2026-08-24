@@ -50,7 +50,7 @@ Do not force-push to the default branch. Do not rewrite published tags.
    ```
 
 4. The release workflow checks the tag is on `origin/main`, waits for `ci`, then GoReleaser publishes.
-5. Refresh `Formula/squad-oc.rb`, `bucket/squad-oc.json`, and `packaging/winget/` from that tag's `checksums.txt` so package managers pin the new assets.
+5. Approve the `chore: pin Homebrew, Scoop, and winget to vX.Y.Z` PR. Auto-merge lands it when `ci` is green. Set repository secret `PACKAGING_BUMP_TOKEN` (fine-grained PAT or GitHub App, contents + pull-requests) so that PR can run `ci`. `upgrade --self` already works from the GitHub Release if the bump is delayed.
 
 `go build` (and CI's compile job) report `dev`. GoReleaser injects the tag into `version.Version`, so `squad-oc version` on a release binary matches the tag. Do not edit `internal/version/version.go` to bump the version.
 
