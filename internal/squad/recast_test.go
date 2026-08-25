@@ -360,3 +360,129 @@ func TestUpgradeThenRecastRestoresSquadModel(t *testing.T) {
 		t.Fatalf("upgrade wiped orchestrator model:\n%s", got)
 	}
 }
+
+func TestSetMemberModelPromotesColumn(t *testing.T) {
+	root := t.TempDir()
+	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	if err := SetMemberModel(root, "Lead", "anthropic/claude-sonnet-4-5"); err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := os.ReadFile(filepath.Join(ResolveDir(root), "team.md"))
+	if !strings.Contains(string(raw), "Model") || !strings.Contains(string(raw), "anthropic/claude-sonnet-4-5") {
+		t.Fatalf("%s", raw)
+	}
+	members, err := ReadTeam(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var lead TeamMember
+	for _, m := range members {
+		if m.ID == "lead" {
+			lead = m
+		}
+	}
+	if lead.Model != "anthropic/claude-sonnet-4-5" {
+		t.Fatalf("%+v", members)
+	}
+	if _, err := Recast(root); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := os.ReadFile(filepath.Join(OpencodeAgentsDir(root), "lead.md"))
+	if !strings.Contains(string(got), "model: anthropic/claude-sonnet-4-5") {
+		t.Fatal(string(got))
+	}
+}
+
+func TestSetSquadModelAndClear(t *testing.T) {
+	root := t.TempDir()
+	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	if err := SetSquadModel(root, "xai/grok-3"); err != nil {
+		t.Fatal(err)
+	}
+	if ReadSquadModelMust(t, root) != "xai/grok-3" {
+		t.Fatal("set")
+	}
+	if err := SetSquadModel(root, ""); err != nil {
+		t.Fatal(err)
+	}
+	if ReadSquadModelMust(t, root) != "" {
+		t.Fatal("clear")
+	}
+}
+
+func TestAddMemberWithModel(t *testing.T) {
+	root := t.TempDir()
+	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	if err := AddMember(root, "Designer", "Design", "opencode/gpt-5.1-codex"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Recast(root); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := os.ReadFile(filepath.Join(OpencodeAgentsDir(root), "designer.md"))
+	if !strings.Contains(string(got), "model: opencode/gpt-5.1-codex") {
+		t.Fatal(string(got))
+	}
+}
+
+func TestApplyThemeKeepsModelCell(t *testing.T) {
+	root := t.TempDir()
+	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	if err := SetMemberModel(root, "Lead", "anthropic/claude-sonnet-4-5"); err != nil {
+		t.Fatal(err)
+	}
+	if err := ApplyTheme(root, "office"); err != nil {
+		t.Fatal(err)
+	}
+	members, _ := ReadTeam(root)
+	found := false
+	for _, m := range members {
+		if m.ID == "lead" && m.Model == "anthropic/claude-sonnet-4-5" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("theme wiped model: %+v", members)
+	}
+}
+
+func ReadSquadModelMust(t *testing.T, root string) string {
+	t.Helper()
+	s, err := ReadSquadModel(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return s
+}
+
+func TestRecastThemedHostStillInjects(t *testing.T) {
+	root := t.TempDir()
+	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root, Theme: "office"}); err != nil {
+		t.Fatal(err)
+	}
+	// birth office: memory+host id is michael. Set lead/michael model via team.md Model column after parse.
+	if err := SetMemberModel(root, "Michael", "anthropic/claude-sonnet-4-5"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Recast(root); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(filepath.Join(OpencodeAgentsDir(root), "michael.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(got), "model: anthropic/claude-sonnet-4-5") {
+		t.Fatalf("%s", got)
+	}
+	if !strings.Contains(string(got), "You are **Lead**") {
+		t.Fatalf("stock prompt lost:\n%s", got)
+	}
+}

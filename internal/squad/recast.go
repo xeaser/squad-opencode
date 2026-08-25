@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -23,6 +24,13 @@ func AddMember(projectRoot, name, role, model string) error {
 	name = strings.TrimSpace(name)
 	role = strings.TrimSpace(role)
 	model = strings.TrimSpace(model)
+	if model != "" {
+		stored, err := ValidateModelID(model)
+		if err != nil {
+			return err
+		}
+		model = stored
+	}
 	if name == "" {
 		return fmt.Errorf("name required")
 	}
@@ -127,13 +135,102 @@ func RemoveMember(projectRoot, name string) error {
 	return nil
 }
 
+// ValidateModelID trims a model id. Empty or "-" store as inherit/clear.
+// Any other value must contain "/" (provider/model-id).
+func ValidateModelID(raw string) (string, error) {
+	s := strings.TrimSpace(raw)
+	if s == "" || s == "-" {
+		return "", nil
+	}
+	if !strings.Contains(s, "/") {
+		return "", fmt.Errorf("model %q must be provider/model-id", raw)
+	}
+	return s, nil
+}
+
+// SetMemberModel writes a Members Model cell. name matches like RemoveMember.
+// Empty or "-" clears the cell. Missing Model column is promoted first.
+func SetMemberModel(projectRoot, name, model string) error {
+	if !IsInitialized(projectRoot) {
+		return fmt.Errorf("not initialized")
+	}
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return fmt.Errorf("name required")
+	}
+	id := memberID(name)
+	if id == "squad" {
+		return fmt.Errorf("%q is reserved for the coordinator agent", name)
+	}
+	stored, err := ValidateModelID(model)
+	if err != nil {
+		return err
+	}
+	members, err := ReadTeam(projectRoot)
+	if err != nil {
+		return err
+	}
+	var found TeamMember
+	ok := false
+	for _, m := range members {
+		if m.ID == id || strings.EqualFold(m.Name, name) {
+			found = m
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("member %q not found", name)
+	}
+	teamFile := filepath.Join(ResolveDir(projectRoot), "team.md")
+	raw, err := os.ReadFile(teamFile)
+	if err != nil {
+		return err
+	}
+	next, err := setMemberModelCell(string(raw), found, stored)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(teamFile, []byte(next), 0o644)
+}
+
+// SetSquadModel writes the Coordinator Squad Model cell. Empty or "-" clears it.
+// Missing Model column is promoted first.
+func SetSquadModel(projectRoot, model string) error {
+	if !IsInitialized(projectRoot) {
+		return fmt.Errorf("not initialized")
+	}
+	stored, err := ValidateModelID(model)
+	if err != nil {
+		return err
+	}
+	teamFile := filepath.Join(ResolveDir(projectRoot), "team.md")
+	raw, err := os.ReadFile(teamFile)
+	if err != nil {
+		return err
+	}
+	next, err := setSquadModelCell(string(raw), stored)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(teamFile, []byte(next), 0o644)
+}
+
 func memberID(name string) string {
 	return strings.ToLower(strings.ReplaceAll(strings.TrimSpace(name), " ", "-"))
 }
 
 func appendMemberRow(content, name, role, id, model string) (string, error) {
-	row := fmt.Sprintf("| %s | %s | `.squad/agents/%s/charter.md` | Active |", name, role, id)
 	if model != "" {
+		var err error
+		content, err = ensureSectionModelColumn(content, reMembersHeading, false)
+		if err != nil {
+			return "", err
+		}
+	}
+	hasModel := sectionHeaderHasModel(content, reMembersHeading, false)
+	row := fmt.Sprintf("| %s | %s | `.squad/agents/%s/charter.md` | Active |", name, role, id)
+	if hasModel {
 		row = fmt.Sprintf("| %s | %s | `.squad/agents/%s/charter.md` | Active | %s |", name, role, id, model)
 	}
 	lines := strings.Split(content, "\n")
@@ -158,7 +255,14 @@ func appendMemberRow(content, name, role, id, model string) (string, error) {
 	if lastTable >= 0 {
 		return insertLine(lines, lastTable+1, row), nil
 	}
-	block := "\n## Members\n\n| Name | Role | Charter | Status |\n|------|------|---------|--------|\n" + row + "\n"
+	header := "| Name | Role | Charter | Status |"
+	sep := "|------|------|---------|--------|"
+	if model != "" {
+		header = "| Name | Role | Charter | Status | Model |"
+		sep = "|------|------|---------|--------|-------|"
+		row = fmt.Sprintf("| %s | %s | `.squad/agents/%s/charter.md` | Active | %s |", name, role, id, model)
+	}
+	block := "\n## Members\n\n" + header + "\n" + sep + "\n" + row + "\n"
 	return strings.TrimRight(content, "\n") + block, nil
 }
 
@@ -207,6 +311,206 @@ func removeMemberRow(content string, member TeamMember) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("member %q not found", member.Name)
+}
+
+func setMemberModelCell(content string, member TeamMember, model string) (string, error) {
+	lines := strings.Split(content, "\n")
+	headerIdx, sepIdx, dataIdx, cols := locateSectionTable(lines, reMembersHeading, false)
+	if headerIdx < 0 {
+		return "", fmt.Errorf("members table not found")
+	}
+	if _, ok := cols["model"]; !ok {
+		if model == "" {
+			return content, nil
+		}
+		cols, lines = promoteModelColumn(lines, headerIdx, sepIdx, dataIdx)
+	}
+	modelIdx, ok := cols["model"]
+	if !ok {
+		return "", fmt.Errorf("model column missing")
+	}
+	for _, i := range dataIdx {
+		cells := splitTableCells(strings.TrimSpace(strings.TrimSuffix(lines[i], "\r")))
+		if rowMatchesMember(cells, member) {
+			lines[i] = setTableCell(lines[i], modelIdx, model)
+			return strings.Join(lines, "\n"), nil
+		}
+	}
+	return "", fmt.Errorf("member %q not found", member.Name)
+}
+
+func setSquadModelCell(content string, model string) (string, error) {
+	if !reCoordinatorHeading.MatchString(content) {
+		return "", fmt.Errorf("coordinator table not found")
+	}
+	lines := strings.Split(content, "\n")
+	headerIdx, sepIdx, dataIdx, cols := locateSectionTable(lines, reCoordinatorHeading, true)
+	if headerIdx < 0 {
+		return "", fmt.Errorf("coordinator table not found")
+	}
+	if _, ok := cols["model"]; !ok {
+		if model == "" {
+			return content, nil
+		}
+		cols, lines = promoteModelColumn(lines, headerIdx, sepIdx, dataIdx)
+	}
+	modelIdx, ok := cols["model"]
+	if !ok {
+		return "", fmt.Errorf("model column missing")
+	}
+	chosen := -1
+	for _, i := range dataIdx {
+		cells := splitTableCells(strings.TrimSpace(strings.TrimSuffix(lines[i], "\r")))
+		if len(cells) > 0 && strings.EqualFold(cells[0], "squad") {
+			chosen = i
+			break
+		}
+	}
+	if chosen < 0 && len(dataIdx) == 1 {
+		chosen = dataIdx[0]
+	}
+	if chosen < 0 {
+		return "", fmt.Errorf("coordinator squad row not found")
+	}
+	lines[chosen] = setTableCell(lines[chosen], modelIdx, model)
+	return strings.Join(lines, "\n"), nil
+}
+
+func ensureSectionModelColumn(content string, section *regexp.Regexp, requireHeading bool) (string, error) {
+	lines := strings.Split(content, "\n")
+	headerIdx, sepIdx, dataIdx, cols := locateSectionTable(lines, section, requireHeading)
+	if headerIdx < 0 {
+		return content, nil
+	}
+	if _, ok := cols["model"]; ok {
+		return content, nil
+	}
+	_, lines = promoteModelColumn(lines, headerIdx, sepIdx, dataIdx)
+	return strings.Join(lines, "\n"), nil
+}
+
+func sectionHeaderHasModel(content string, section *regexp.Regexp, requireHeading bool) bool {
+	lines := strings.Split(content, "\n")
+	_, _, _, cols := locateSectionTable(lines, section, requireHeading)
+	if cols == nil {
+		return false
+	}
+	_, ok := cols["model"]
+	return ok
+}
+
+func locateSectionTable(lines []string, section *regexp.Regexp, requireHeading bool) (headerIdx, sepIdx int, dataIdx []int, cols map[string]int) {
+	headerIdx, sepIdx = -1, -1
+	hasHeading := false
+	if section != nil {
+		for _, line := range lines {
+			if section.MatchString(strings.TrimSpace(strings.TrimSuffix(line, "\r"))) {
+				hasHeading = true
+				break
+			}
+		}
+	}
+	inSection := section == nil || (!requireHeading && !hasHeading)
+	for i, line := range lines {
+		trim := strings.TrimSpace(strings.TrimSuffix(line, "\r"))
+		if section != nil && section.MatchString(trim) {
+			inSection = true
+			headerIdx, sepIdx = -1, -1
+			dataIdx = nil
+			cols = nil
+			continue
+		}
+		if hasHeading && reAnyHeading.MatchString(trim) && (section == nil || !section.MatchString(trim)) {
+			inSection = false
+			continue
+		}
+		if !inSection || !strings.HasPrefix(trim, "|") {
+			continue
+		}
+		if reTableSep.MatchString(trim) {
+			if headerIdx >= 0 && sepIdx < 0 {
+				sepIdx = i
+			}
+			continue
+		}
+		cells := splitTableCells(trim)
+		if len(cells) == 0 {
+			continue
+		}
+		if strings.EqualFold(cells[0], "name") || reNameHeader.MatchString(trim) {
+			headerIdx = i
+			cols = headerColumns(cells)
+			dataIdx = nil
+			continue
+		}
+		if headerIdx >= 0 {
+			dataIdx = append(dataIdx, i)
+		}
+	}
+	return
+}
+
+func promoteModelColumn(lines []string, headerIdx, sepIdx int, dataIdx []int) (map[string]int, []string) {
+	if headerIdx >= 0 {
+		lines[headerIdx] = appendTableCell(lines[headerIdx], "Model", false)
+	}
+	if sepIdx >= 0 {
+		lines[sepIdx] = appendTableCell(lines[sepIdx], "-------", true)
+	}
+	for _, i := range dataIdx {
+		lines[i] = appendTableCell(lines[i], "", false)
+	}
+	var cols map[string]int
+	if headerIdx >= 0 {
+		trim := strings.TrimSpace(strings.TrimSuffix(lines[headerIdx], "\r"))
+		cols = headerColumns(splitTableCells(trim))
+	}
+	return cols, lines
+}
+
+func appendTableCell(line, cell string, sep bool) string {
+	eol := ""
+	if strings.HasSuffix(line, "\r") {
+		eol = "\r"
+		line = strings.TrimSuffix(line, "\r")
+	}
+	s := strings.TrimRight(line, " \t")
+	if !strings.HasSuffix(s, "|") {
+		s += " |"
+	}
+	if sep {
+		if cell == "" {
+			cell = "-------"
+		}
+		return s + cell + "|" + eol
+	}
+	if cell == "" {
+		return s + "  |" + eol
+	}
+	return s + " " + cell + " |" + eol
+}
+
+func setTableCell(line string, idx int, value string) string {
+	eol := ""
+	if strings.HasSuffix(line, "\r") {
+		eol = "\r"
+		line = strings.TrimSuffix(line, "\r")
+	}
+	cells := splitTableCells(line)
+	for len(cells) <= idx {
+		cells = append(cells, "")
+	}
+	cells[idx] = value
+	return "| " + strings.Join(cells, " | ") + " |" + eol
+}
+
+func rowMatchesMember(cells []string, member TeamMember) bool {
+	if len(cells) == 0 {
+		return false
+	}
+	name := cells[0]
+	rowID := memberIDFromRow(name, cells)
+	return rowID == member.ID || strings.EqualFold(name, member.Name)
 }
 
 func defaultCharter(name, role, id string) string {
