@@ -244,6 +244,23 @@ func TestReadTeamAfterInit(t *testing.T) {
 	}
 }
 
+func TestInitTeamMarkdownHasModelColumn(t *testing.T) {
+	root := t.TempDir()
+	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(ResolveDir(root), "team.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), "Model") {
+		t.Fatalf("new team.md should include Model column:\n%s", raw)
+	}
+	if ParseSquadModel(string(raw)) != "" {
+		t.Fatal("default model must be empty")
+	}
+}
+
 func isolateHome(t *testing.T) string {
 	t.Helper()
 	home := t.TempDir()

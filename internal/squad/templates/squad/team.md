@@ -5,18 +5,18 @@
 
 ## Coordinator
 
-| Name | Role | Notes |
-|------|------|-------|
-| Squad | Coordinator | Routes work, enforces handoffs. Does not own domain implementation alone. |
+| Name | Role | Model | Notes |
+|------|------|-------|-------|
+| Squad | Coordinator |  | Routes work, enforces handoffs. Does not own domain implementation alone. |
 
 ## Members
 
-| Name | Role | Charter | Status |
-|------|------|---------|--------|
-| Lead | Lead | `.squad/agents/lead/charter.md` | Active |
-| Frontend | Frontend | `.squad/agents/frontend/charter.md` | Active |
-| Backend | Backend | `.squad/agents/backend/charter.md` | Active |
-| Tester | Tester | `.squad/agents/tester/charter.md` | Active |
+| Name | Role | Charter | Status | Model |
+|------|------|---------|--------|-------|
+| Lead | Lead | `.squad/agents/lead/charter.md` | Active |  |
+| Frontend | Frontend | `.squad/agents/frontend/charter.md` | Active |  |
+| Backend | Backend | `.squad/agents/backend/charter.md` | Active |  |
+| Tester | Tester | `.squad/agents/tester/charter.md` | Active |  |
 
 ## How to work
 

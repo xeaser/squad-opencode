@@ -47,6 +47,14 @@ Today’s stand-ins:
 | Shared team + decisions | `squad-oc link <team-dir>` | still `link` (`mcp apply` reads the linked team dir) |
 | Memory | `.squad/decisions.md` | still files — not `squad_state` |
 
+### OpenCode-native (not original Squad)
+
+Not a Copilot port and not an original-Squad ease mapping.
+
+| Capability | squad-oc | Status |
+|------------|----------|--------|
+| Per-agent model | `cast --model` / `cast --add --model`; empty `team.md` Model cells inherit Squad, then session | **shipped** |
+
 ---
 
 ## Won’t port

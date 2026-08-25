@@ -77,7 +77,10 @@ OpenCode creates `.opencode/package.json` (`@opencode-ai/plugin`) and runs an in
 | `upgrade [--dry-run] [--force] [--global] [--self]` | Refresh host templates; `--self` replaces this binary from GitHub Releases |
 | `doctor` / `heartbeat` | Health checks |
 | `status` / `cast` | Team table |
-| `cast --add <name> [--role <role>]` | Add a member and regenerate `.opencode/agents` |
+| `cast --add <name> [--role <role>] [--model <provider/id>]` | Add a member and regenerate `.opencode/agents` |
+| `cast --model <name> <provider/id>` | Pin a member to an OpenCode model id |
+| `cast --model squad <provider/id>` | Pin the coordinator model |
+| `cast --model <name|-> -` | Clear a pin (inherit Squad, then session) |
 | `cast --remove <name>` | Remove a member and regenerate `.opencode/agents` |
 | `cast --theme office` / `none` | `init --theme office` (native `@michael`) or later `cast --theme office` (mention map; `@lead` gone) |
 | `recast` | Regenerate `.opencode/agents` from `.squad/team.md` |
