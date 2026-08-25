@@ -137,3 +137,36 @@ func TestStatusReportRemoteLinkSHAWithoutRef(t *testing.T) {
 		t.Fatalf("expected SHA when LinkRef is empty:\n%s", got)
 	}
 }
+
+func TestStatusReportModels(t *testing.T) {
+	root := t.TempDir()
+	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	out, err := StatusReport(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "Model: (session)") {
+		t.Fatalf("empty orchestrator:\n%s", out)
+	}
+	if err := SetSquadModel(root, "xai/grok-3"); err != nil {
+		t.Fatal(err)
+	}
+	if err := SetMemberModel(root, "Lead", "anthropic/claude-sonnet-4-5"); err != nil {
+		t.Fatal(err)
+	}
+	out, err = StatusReport(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "Model: xai/grok-3") {
+		t.Fatalf("orchestrator:\n%s", out)
+	}
+	if !strings.Contains(out, "anthropic/claude-sonnet-4-5") {
+		t.Fatalf("override:\n%s", out)
+	}
+	if !strings.Contains(out, "xai/grok-3  (team)") && !strings.Contains(out, "xai/grok-3 (team)") {
+		t.Fatalf("inherit marker:\n%s", out)
+	}
+}

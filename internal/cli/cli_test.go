@@ -400,6 +400,47 @@ func TestCastThemeNoneAfterInitOffice(t *testing.T) {
 	}
 }
 
+func TestCastModelFlags(t *testing.T) {
+	root := t.TempDir()
+	prev, _ := os.Getwd()
+	if err := os.Chdir(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(prev) })
+	if Execute([]string{"init", "--preset", "default", "--description", "models"}) != 0 {
+		t.Fatal("init")
+	}
+	if Execute([]string{"cast", "--model", "squad", "xai/grok-3"}) != 0 {
+		t.Fatal("set squad")
+	}
+	if Execute([]string{"cast", "--add", "Designer", "--role", "Design", "--model", "opencode/gpt-5.1-codex"}) != 0 {
+		t.Fatal("add")
+	}
+	got, _ := os.ReadFile(filepath.Join(root, ".opencode", "agents", "designer.md"))
+	if !strings.Contains(string(got), "model: opencode/gpt-5.1-codex") {
+		t.Fatal(string(got))
+	}
+	if Execute([]string{"cast", "--model", "Designer", "-"}) != 0 {
+		t.Fatal("clear")
+	}
+	got, _ = os.ReadFile(filepath.Join(root, ".opencode", "agents", "designer.md"))
+	if !strings.Contains(string(got), "model: xai/grok-3") {
+		t.Fatalf("should inherit squad after clear:\n%s", got)
+	}
+	if Execute([]string{"cast", "--model", "Lead", "nonesuch"}) != 2 {
+		t.Fatal("missing slash must be usage 2")
+	}
+	if Execute([]string{"cast", "--model"}) != 2 {
+		t.Fatal("missing args")
+	}
+	if Execute([]string{"cast", "--theme", "office", "--model", "Lead", "xai/grok-3"}) != 2 {
+		t.Fatal("exclusive")
+	}
+	if Execute([]string{"cast", "--remove", "Designer", "--model", "Lead", "xai/grok-3"}) != 2 {
+		t.Fatal("exclusive remove")
+	}
+}
+
 func TestRecastListsHostAgentIDs(t *testing.T) {
 	root := t.TempDir()
 	prev, _ := os.Getwd()

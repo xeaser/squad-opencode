@@ -18,6 +18,10 @@ func StatusReport(root string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	squadModel, err := ReadSquadModel(root)
+	if err != nil {
+		return "", err
+	}
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "Squad status — %s\n", root)
@@ -47,6 +51,11 @@ func StatusReport(root string) (string, error) {
 			}
 		}
 	}
+	if squadModel != "" {
+		fmt.Fprintf(&b, "Model: %s\n", squadModel)
+	} else {
+		fmt.Fprintf(&b, "Model: (session)\n")
+	}
 	b.WriteByte('\n')
 	if len(members) == 0 {
 		b.WriteString("(no members parsed from team.md)\n")
@@ -59,7 +68,15 @@ func StatusReport(root string) (string, error) {
 		}
 		fmt.Fprintf(&b, "%-*s  Role\n%s  ----\n", width, "Name", strings.Repeat("-", width))
 		for _, m := range members {
-			fmt.Fprintf(&b, "%-*s  %s  [%s]\n", width, m.Name, m.Role, m.Status)
+			effective := EffectiveModel(m.Model, squadModel)
+			switch {
+			case m.Model == "" && squadModel != "":
+				fmt.Fprintf(&b, "%-*s  %s  [%s]  %s (team)\n", width, m.Name, m.Role, m.Status, effective)
+			case m.Model == "" && squadModel == "":
+				fmt.Fprintf(&b, "%-*s  %s  [%s]  (session)\n", width, m.Name, m.Role, m.Status)
+			default:
+				fmt.Fprintf(&b, "%-*s  %s  [%s]  %s\n", width, m.Name, m.Role, m.Status, effective)
+			}
 		}
 	}
 
