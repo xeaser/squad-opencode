@@ -12,7 +12,7 @@ func TestAddMemberAndRecast(t *testing.T) {
 	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root}); err != nil {
 		t.Fatal(err)
 	}
-	if err := AddMember(root, "Designer", "Design"); err != nil {
+	if err := AddMember(root, "Designer", "Design", ""); err != nil {
 		t.Fatal(err)
 	}
 	members, err := ReadTeam(root)
@@ -57,7 +57,7 @@ func TestAddMemberRejectsDuplicate(t *testing.T) {
 	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root}); err != nil {
 		t.Fatal(err)
 	}
-	if err := AddMember(root, "Lead", "Lead"); err == nil {
+	if err := AddMember(root, "Lead", "Lead", ""); err == nil {
 		t.Fatal("expected duplicate error")
 	}
 }
@@ -247,5 +247,116 @@ func TestRemoveMemberRejectsMissingAndSquad(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(root, ".opencode", "agents", "squad.md")); err != nil {
 		t.Fatal("squad.md must not be deleted")
+	}
+}
+
+func TestRecastWritesMemberModelAndInheritsSquad(t *testing.T) {
+	root := t.TempDir()
+	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	team := filepath.Join(ResolveDir(root), "team.md")
+	body := `# Mission Control
+
+## Coordinator
+
+| Name | Role | Model | Notes |
+|------|------|-------|-------|
+| Squad | Coordinator | xai/grok-3 | Routes |
+
+## Members
+
+| Name | Role | Charter | Status | Model |
+|------|------|---------|--------|-------|
+| Lead | Lead | ` + "`.squad/agents/lead/charter.md`" + ` | Active | anthropic/claude-sonnet-4-5 |
+| Frontend | Frontend | ` + "`.squad/agents/frontend/charter.md`" + ` | Active | |
+| Backend | Backend | ` + "`.squad/agents/backend/charter.md`" + ` | Active | |
+| Tester | Tester | ` + "`.squad/agents/tester/charter.md`" + ` | Active | |
+`
+	if err := os.WriteFile(team, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	marker := "CUSTOM COORDINATOR BODY LINE"
+	squadPath := filepath.Join(OpencodeAgentsDir(root), "squad.md")
+	raw, err := os.ReadFile(squadPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(squadPath, append(raw, []byte("\n"+marker+"\n")...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Recast(root); err != nil {
+		t.Fatal(err)
+	}
+	lead, _ := os.ReadFile(filepath.Join(OpencodeAgentsDir(root), "lead.md"))
+	if !strings.Contains(string(lead), "model: anthropic/claude-sonnet-4-5") {
+		t.Fatalf("lead override:\n%s", lead)
+	}
+	front, _ := os.ReadFile(filepath.Join(OpencodeAgentsDir(root), "frontend.md"))
+	if !strings.Contains(string(front), "model: xai/grok-3") {
+		t.Fatalf("frontend inherit:\n%s", front)
+	}
+	squad, _ := os.ReadFile(squadPath)
+	if !strings.Contains(string(squad), "model: xai/grok-3") {
+		t.Fatalf("squad splice:\n%s", squad)
+	}
+	if !strings.Contains(string(squad), marker) {
+		t.Fatalf("squad body lost:\n%s", squad)
+	}
+}
+
+func TestRecastOmitsModelWhenBothEmpty(t *testing.T) {
+	root := t.TempDir()
+	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Recast(root); err != nil {
+		t.Fatal(err)
+	}
+	lead, _ := os.ReadFile(filepath.Join(OpencodeAgentsDir(root), "lead.md"))
+	if strings.Contains(string(lead), "model:") {
+		t.Fatalf("unexpected model:\n%s", lead)
+	}
+	squad, _ := os.ReadFile(filepath.Join(OpencodeAgentsDir(root), "squad.md"))
+	if strings.Contains(string(squad), "\nmodel:") || strings.HasPrefix(string(squad), "model:") {
+		t.Fatalf("squad should have no model:\n%s", squad)
+	}
+}
+
+func TestUpgradeThenRecastRestoresSquadModel(t *testing.T) {
+	root := t.TempDir()
+	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	team := filepath.Join(ResolveDir(root), "team.md")
+	body := `# Mission Control
+
+## Coordinator
+
+| Name | Role | Model | Notes |
+|------|------|-------|-------|
+| Squad | Coordinator | xai/grok-3 | Routes |
+
+## Members
+
+| Name | Role | Charter | Status | Model |
+|------|------|---------|--------|-------|
+| Lead | Lead | ` + "`.squad/agents/lead/charter.md`" + ` | Active | |
+| Frontend | Frontend | ` + "`.squad/agents/frontend/charter.md`" + ` | Active | |
+| Backend | Backend | ` + "`.squad/agents/backend/charter.md`" + ` | Active | |
+| Tester | Tester | ` + "`.squad/agents/tester/charter.md`" + ` | Active | |
+`
+	if err := os.WriteFile(team, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Recast(root); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := UpgradeHostFiles(UpgradeOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := os.ReadFile(filepath.Join(OpencodeAgentsDir(root), "squad.md"))
+	if !strings.Contains(string(got), "model: xai/grok-3") {
+		t.Fatalf("upgrade wiped orchestrator model:\n%s", got)
 	}
 }

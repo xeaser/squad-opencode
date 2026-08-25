@@ -60,7 +60,7 @@ func TestApplyThemeOfficeThenNone(t *testing.T) {
 	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root}); err != nil {
 		t.Fatal(err)
 	}
-	if err := AddMember(root, "Designer", "Design"); err != nil {
+	if err := AddMember(root, "Designer", "Design", ""); err != nil {
 		t.Fatal(err)
 	}
 	teamPath := filepath.Join(root, ".squad", "team.md")
@@ -190,7 +190,7 @@ func TestApplyThemeNoneAfterInitOrigin(t *testing.T) {
 	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root, Theme: ThemeOffice}); err != nil {
 		t.Fatal(err)
 	}
-	if err := AddMember(root, "Designer", "Design"); err != nil {
+	if err := AddMember(root, "Designer", "Design", ""); err != nil {
 		t.Fatal(err)
 	}
 

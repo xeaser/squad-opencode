@@ -15,12 +15,14 @@ type RecastResult struct {
 }
 
 // AddMember appends a row to team.md and creates charter/knowledge if missing.
-func AddMember(projectRoot, name, role string) error {
+// model is optional; empty keeps today's 4-column Members append.
+func AddMember(projectRoot, name, role, model string) error {
 	if !IsInitialized(projectRoot) {
 		return fmt.Errorf("not initialized")
 	}
 	name = strings.TrimSpace(name)
 	role = strings.TrimSpace(role)
+	model = strings.TrimSpace(model)
 	if name == "" {
 		return fmt.Errorf("name required")
 	}
@@ -45,7 +47,7 @@ func AddMember(projectRoot, name, role string) error {
 	if err != nil {
 		return err
 	}
-	next, err := appendMemberRow(string(raw), name, role, id)
+	next, err := appendMemberRow(string(raw), name, role, id, model)
 	if err != nil {
 		return err
 	}
@@ -129,8 +131,11 @@ func memberID(name string) string {
 	return strings.ToLower(strings.ReplaceAll(strings.TrimSpace(name), " ", "-"))
 }
 
-func appendMemberRow(content, name, role, id string) (string, error) {
+func appendMemberRow(content, name, role, id, model string) (string, error) {
 	row := fmt.Sprintf("| %s | %s | `.squad/agents/%s/charter.md` | Active |", name, role, id)
+	if model != "" {
+		row = fmt.Sprintf("| %s | %s | `.squad/agents/%s/charter.md` | Active | %s |", name, role, id, model)
+	}
 	lines := strings.Split(content, "\n")
 	inMembers := false
 	lastTable := -1
@@ -225,12 +230,17 @@ Write lasting notes to `+"`"+`.squad/agents/%s/knowledge.md`+"`"+`.
 `, name, role, role, id)
 }
 
-// Recast writes .opencode/agents/<host-id>.md from the live team. Does not touch squad.md.
+// Recast writes .opencode/agents/<host-id>.md from the live team and splices
+// model: onto squad.md (coordinator body is otherwise left alone).
 func Recast(projectRoot string) (RecastResult, error) {
 	if !IsInitialized(projectRoot) {
 		return RecastResult{}, fmt.Errorf("not initialized")
 	}
 	members, err := ReadTeam(projectRoot)
+	if err != nil {
+		return RecastResult{}, err
+	}
+	squadModel, err := ReadSquadModel(projectRoot)
 	if err != nil {
 		return RecastResult{}, err
 	}
@@ -251,7 +261,7 @@ func Recast(projectRoot string) (RecastResult, error) {
 		if m.ID == "" || m.ID == "squad" {
 			continue
 		}
-		body, err := agentMarkdown(tpl, m)
+		body, err := agentMarkdown(tpl, m, squadModel)
 		if err != nil {
 			return res, err
 		}
@@ -266,6 +276,9 @@ func Recast(projectRoot string) (RecastResult, error) {
 		hostIDs[host] = struct{}{}
 	}
 	if err := pruneStaleHostAgents(destDir, liveIDs, hostIDs); err != nil {
+		return res, err
+	}
+	if err := spliceSquadModel(projectRoot, squadModel); err != nil {
 		return res, err
 	}
 	return res, nil
@@ -318,17 +331,17 @@ func stockRoleID(id string) string {
 	return id
 }
 
-func agentMarkdown(tpl fs.FS, m TeamMember) (string, error) {
+func agentMarkdown(tpl fs.FS, m TeamMember, squadModel string) (string, error) {
 	role := stockRoleID(m.ID)
+	var body string
 	data, err := fs.ReadFile(tpl, "opencode/agents/"+role+".md")
 	if err == nil {
-		body := string(data)
+		body = string(data)
 		if role != m.ID {
 			body = strings.ReplaceAll(body, ".squad/agents/"+role+"/", ".squad/agents/"+m.ID+"/")
 		}
-		return body, nil
-	}
-	return fmt.Sprintf(`---
+	} else {
+		body = fmt.Sprintf(`---
 description: %s — %s
 mode: subagent
 permission:
@@ -347,5 +360,93 @@ You are **%s** (%s) on this project's Squad team.
 ## Escalate to the human
 
 Security-sensitive changes, unclear product priorities, or work outside your charter.
-`, m.Name, m.Role, m.Name, m.Role, m.ID, m.ID), nil
+`, m.Name, m.Role, m.Name, m.Role, m.ID, m.ID)
+	}
+	if effective := EffectiveModel(m.Model, squadModel); effective != "" {
+		body = spliceFrontmatterModel(body, effective)
+	}
+	return body, nil
+}
+
+func spliceSquadModel(projectRoot, squadModel string) error {
+	path := filepath.Join(OpencodeAgentsDir(projectRoot), "squad.md")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
+		data, err = fs.ReadFile(TemplateFS(), "opencode/agents/squad.md")
+		if err != nil {
+			return err
+		}
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return err
+		}
+	}
+	next := spliceFrontmatterModel(string(data), squadModel)
+	return os.WriteFile(path, []byte(next), 0o644)
+}
+
+func spliceFrontmatterModel(content, model string) string {
+	model = strings.TrimSpace(model)
+	lines := strings.Split(content, "\n")
+	start, end := -1, -1
+	for i, line := range lines {
+		if strings.TrimSpace(strings.TrimSuffix(line, "\r")) != "---" {
+			continue
+		}
+		if start < 0 {
+			start = i
+			continue
+		}
+		end = i
+		break
+	}
+	if start < 0 || end < 0 {
+		return content
+	}
+
+	fm := append([]string(nil), lines[start+1:end]...)
+	modelIdx, modeIdx, descIdx := -1, -1, -1
+	for i, line := range fm {
+		trim := strings.TrimSpace(strings.TrimSuffix(line, "\r"))
+		switch {
+		case strings.HasPrefix(trim, "model:"):
+			modelIdx = i
+		case strings.HasPrefix(trim, "mode:"):
+			modeIdx = i
+		case strings.HasPrefix(trim, "description:"):
+			descIdx = i
+		}
+	}
+
+	if model == "" {
+		if modelIdx < 0 {
+			return content
+		}
+		fm = append(fm[:modelIdx], fm[modelIdx+1:]...)
+	} else {
+		newLine := "model: " + model
+		if modelIdx >= 0 {
+			fm[modelIdx] = newLine
+		} else {
+			at := 0
+			if modeIdx >= 0 {
+				at = modeIdx + 1
+			} else if descIdx >= 0 {
+				at = descIdx + 1
+			}
+			next := make([]string, 0, len(fm)+1)
+			next = append(next, fm[:at]...)
+			next = append(next, newLine)
+			next = append(next, fm[at:]...)
+			fm = next
+		}
+	}
+
+	out := make([]string, 0, len(lines)+1)
+	out = append(out, lines[:start+1]...)
+	out = append(out, fm...)
+	out = append(out, lines[end:]...)
+	return strings.Join(out, "\n")
 }

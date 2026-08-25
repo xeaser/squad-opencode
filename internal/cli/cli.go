@@ -318,7 +318,7 @@ func cmdCast(args []string) int {
 		fmt.Printf("removed %s; recast %d agent file(s)\n", remove, res.Written)
 		return 0
 	}
-	if err := squad.AddMember(root, add, role); err != nil {
+	if err := squad.AddMember(root, add, role, ""); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
