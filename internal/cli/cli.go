@@ -103,9 +103,12 @@ Commands:
   upgrade [--dry-run] [--force] [--global] [--self]
   doctor | heartbeat
   status | cast
-  cast --add <name> [--role <role>]
+  cast --add <name> [--role <role>] [--model <provider/id>]
   cast --remove <name>
   cast --theme office|none
+  cast --model <name> <provider/id>
+  cast --model squad <provider/id>
+  cast --model <name|-> -
   recast
   run -p <prompt> | --file <path> [--agent name] [--url]
   watch | triage | loop [--execute] [--interval minutes] [--once] [--health] [--url]
@@ -260,7 +263,14 @@ func cmdStatus() int {
 }
 
 func cmdCast(args []string) int {
-	var add, role, remove, theme string
+	var add, role, remove, theme, model, modelName string
+	addMode := false
+	for _, a := range args {
+		if a == "--add" {
+			addMode = true
+			break
+		}
+	}
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch {
@@ -279,6 +289,24 @@ func cmdCast(args []string) int {
 		case a == "--theme":
 			fmt.Fprintln(os.Stderr, "cast --theme requires office or none")
 			return 2
+		case a == "--model":
+			if addMode {
+				if i+1 >= len(args) {
+					fmt.Fprintln(os.Stderr, "cast --model requires a model id")
+					return 2
+				}
+				i++
+				model = args[i]
+			} else {
+				if i+2 >= len(args) {
+					fmt.Fprintln(os.Stderr, "cast --model requires <name> <provider/id>")
+					return 2
+				}
+				i++
+				modelName = args[i]
+				i++
+				model = args[i]
+			}
 		case a == "--help" || a == "-h":
 			printHelp()
 			return 0
@@ -287,7 +315,8 @@ func cmdCast(args []string) int {
 			return 2
 		}
 	}
-	if theme != "" && (add != "" || remove != "") {
+	haveModel := model != "" || modelName != ""
+	if theme != "" && (add != "" || remove != "" || haveModel) {
 		fmt.Fprintln(os.Stderr, "cast: use --theme alone")
 		return 2
 	}
@@ -295,11 +324,21 @@ func cmdCast(args []string) int {
 		fmt.Fprintln(os.Stderr, "cast: use --add or --remove, not both")
 		return 2
 	}
+	if haveModel && remove != "" {
+		fmt.Fprintln(os.Stderr, "cast: use --model or --remove, not both")
+		return 2
+	}
 	if theme != "" {
 		return cmdCastTheme(theme)
 	}
-	if add == "" && remove == "" {
+	if add == "" && remove == "" && !haveModel {
 		return cmdStatus()
+	}
+	if haveModel {
+		if _, err := squad.ValidateModelID(model); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 2
+		}
 	}
 	root, code := cwd()
 	if code != 0 {
@@ -318,16 +357,36 @@ func cmdCast(args []string) int {
 		fmt.Printf("removed %s; recast %d agent file(s)\n", remove, res.Written)
 		return 0
 	}
-	if err := squad.AddMember(root, add, role); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return 1
+	if add != "" {
+		if err := squad.AddMember(root, add, role, model); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		res, err := squad.Recast(root)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		fmt.Printf("added %s; recast %d agent file(s)\n", add, res.Written)
+		return 0
+	}
+	if strings.EqualFold(modelName, "squad") {
+		if err := squad.SetSquadModel(root, model); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+	} else {
+		if err := squad.SetMemberModel(root, modelName, model); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
 	}
 	res, err := squad.Recast(root)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
-	fmt.Printf("added %s; recast %d agent file(s)\n", add, res.Written)
+	fmt.Printf("model %s; recast %d agent file(s)\n", modelName, res.Written)
 	return 0
 }
 

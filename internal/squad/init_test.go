@@ -165,6 +165,71 @@ func TestParseTeamMarkdown(t *testing.T) {
 	}
 }
 
+func TestParseTeamMarkdownModelColumn(t *testing.T) {
+	md := `
+## Coordinator
+
+| Name | Role | Model | Notes |
+|------|------|-------|-------|
+| Squad | Coordinator | xai/grok-3 | Routes work |
+
+## Members
+
+| Name | Role | Charter | Status | Model |
+|------|------|---------|--------|-------|
+| Lead | Lead | ` + "`.squad/agents/lead/charter.md`" + ` | Active | anthropic/claude-sonnet-4-5 |
+| Tester | Tester | ` + "`.squad/agents/tester/charter.md`" + ` | Active | |
+`
+	members := ParseTeamMarkdown(md)
+	if len(members) != 2 {
+		t.Fatalf("want 2, got %+v", members)
+	}
+	if members[0].Model != "anthropic/claude-sonnet-4-5" {
+		t.Fatalf("lead model: %+v", members[0])
+	}
+	if members[1].Model != "" {
+		t.Fatalf("tester must be empty inherit: %+v", members[1])
+	}
+	if got := ParseSquadModel(md); got != "xai/grok-3" {
+		t.Fatalf("squad model %q", got)
+	}
+}
+
+func TestParseTeamMarkdownOldFourColumn(t *testing.T) {
+	md := `
+## Coordinator
+
+| Name | Role | Notes |
+|------|------|-------|
+| Squad | Coordinator | Routes work |
+
+## Members
+
+| Name | Role | Charter | Status |
+|------|------|---------|--------|
+| Lead | Lead | x | Active |
+`
+	members := ParseTeamMarkdown(md)
+	if len(members) != 1 || members[0].Name != "Lead" || members[0].Status != "Active" || members[0].Model != "" {
+		t.Fatalf("%+v", members)
+	}
+	if ParseSquadModel(md) != "" {
+		t.Fatal("missing model column must be empty")
+	}
+}
+
+func TestEffectiveModel(t *testing.T) {
+	if EffectiveModel("anthropic/claude-sonnet-4-5", "xai/grok-3") != "anthropic/claude-sonnet-4-5" {
+		t.Fatal("own wins")
+	}
+	if EffectiveModel("", "xai/grok-3") != "xai/grok-3" {
+		t.Fatal("inherit team")
+	}
+	if EffectiveModel("  ", "") != "" {
+		t.Fatal("both empty")
+	}
+}
+
 func TestReadTeamAfterInit(t *testing.T) {
 	root := t.TempDir()
 	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root}); err != nil {
@@ -176,6 +241,23 @@ func TestReadTeamAfterInit(t *testing.T) {
 	}
 	if len(members) < 4 {
 		t.Fatalf("want >=4 members, got %d", len(members))
+	}
+}
+
+func TestInitTeamMarkdownHasModelColumn(t *testing.T) {
+	root := t.TempDir()
+	if _, err := WriteDefaultPreset(InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(ResolveDir(root), "team.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), "Model") {
+		t.Fatalf("new team.md should include Model column:\n%s", raw)
+	}
+	if ParseSquadModel(string(raw)) != "" {
+		t.Fatal("default model must be empty")
 	}
 }
 

@@ -35,6 +35,7 @@ type TeamMember struct {
 	Name   string
 	Role   string
 	Status string
+	Model  string // raw cell; empty means inherit
 }
 
 // DetectResult describes whether a project has been initialized.
