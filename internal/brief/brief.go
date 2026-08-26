@@ -147,7 +147,9 @@ func pickNext(issues []Ticket, prs []PR) *Ticket {
 	for i := range issues {
 		n := issues[i].Number
 		if n == 0 {
-			fmt.Sscanf(strings.TrimPrefix(issues[i].ID, "#"), "%d", &n)
+			if _, err := fmt.Sscanf(strings.TrimPrefix(issues[i].ID, "#"), "%d", &n); err != nil {
+				n = 0
+			}
 		}
 		if n != 0 && linked[n] {
 			continue
