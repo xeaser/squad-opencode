@@ -133,6 +133,8 @@ func TestReleaseWorkflowOpensOnePackagingPR(t *testing.T) {
 		"needs: [goreleaser]",
 		"copy-packaging-from-dist.sh",
 		"createCommitOnBranch",
+		"graphql --input",
+		"fileChanges",
 		"chore/packaging-",
 		"workflow_dispatch:",
 		"require-previous-release.sh",
@@ -171,6 +173,9 @@ func TestReleaseWorkflowOpensOnePackagingPR(t *testing.T) {
 	}
 	if strings.Contains(s, "gh pr merge") {
 		t.Error("do not merge the packaging PR; a human squash-merges after ci")
+	}
+	if strings.Contains(s, "-F additions") {
+		t.Error("gh -F cannot pass a GraphQL [FileAddition!] list; use graphql --input")
 	}
 }
 
