@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/xeaser/squad-opencode/internal/brief"
 	"github.com/xeaser/squad-opencode/internal/doctor"
 	"github.com/xeaser/squad-opencode/internal/githubissues"
 	"github.com/xeaser/squad-opencode/internal/mcpconfig"
@@ -45,6 +46,8 @@ func Execute(args []string) int {
 		return cmdDoctor()
 	case "status":
 		return cmdStatus()
+	case "brief":
+		return cmdBrief(rest)
 	case "cast":
 		return cmdCast(rest)
 	case "recast":
@@ -103,6 +106,7 @@ Commands:
   upgrade [--dry-run] [--force] [--global] [--self]
   doctor | heartbeat
   status | cast
+  brief [--json]
   cast --add <name> [--role <role>] [--model <provider/id>]
   cast --remove <name>
   cast --theme office|none
@@ -259,6 +263,46 @@ func cmdStatus() int {
 		return 1
 	}
 	fmt.Print(out)
+	return 0
+}
+
+func cmdBrief(args []string) int {
+	asJSON := false
+	for _, a := range args {
+		switch a {
+		case "--json":
+			asJSON = true
+		case "--help", "-h":
+			printHelp()
+			return 0
+		default:
+			fmt.Fprintf(os.Stderr, "Unknown brief flag: %s\n", a)
+			return 2
+		}
+	}
+	root, code := cwd()
+	if code != 0 {
+		return code
+	}
+	if !squad.IsInitialized(root) {
+		fmt.Fprintln(os.Stderr, "Not initialized. Run: squad-oc init --preset default")
+		return 1
+	}
+	rep, err := brief.Collect(context.Background(), brief.Options{ProjectRoot: root})
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if asJSON {
+		raw, err := brief.FormatJSON(rep)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		fmt.Println(string(raw))
+		return 0
+	}
+	fmt.Print(brief.Format(rep))
 	return 0
 }
 
