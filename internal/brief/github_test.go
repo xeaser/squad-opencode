@@ -18,7 +18,8 @@ func TestGitHubParsesLists(t *testing.T) {
 		case strings.Contains(joined, "issue list"):
 			return []byte(`[{"number":11,"title":"unstarted","createdAt":"2026-06-01T00:00:00Z"}]`), nil
 		case strings.Contains(joined, "pr view"):
-			return []byte(`{"closingIssuesReferences":{"nodes":[{"number":10}]}}`), nil
+			// Live gh pr view --json closingIssuesReferences is an array, not {nodes:[]}.
+			return []byte(`{"closingIssuesReferences":[{"number":10}],"body":""}`), nil
 		default:
 			return nil, fmt.Errorf("unexpected gh %v", args)
 		}
@@ -39,6 +40,27 @@ func TestGitHubParsesLists(t *testing.T) {
 	merged, err := prs.ListMerged(context.Background(), 5)
 	if err != nil || len(merged) != 1 || merged[0].Number != 1 {
 		t.Fatalf("merged %+v %v", merged, err)
+	}
+}
+
+func TestGitHubClosingIssuesBodyFallback(t *testing.T) {
+	g := GitHub{Dir: t.TempDir(), run: func(_ context.Context, args ...string) ([]byte, error) {
+		joined := strings.Join(args, " ")
+		switch {
+		case strings.Contains(joined, "pr list") && strings.Contains(joined, "open"):
+			return []byte(`[{"number":4,"title":"body-only","author":{"login":"bob"},"isDraft":false,"reviewDecision":""}]`), nil
+		case strings.Contains(joined, "pr view"):
+			return []byte(`{"closingIssuesReferences":[],"body":"Closes #10"}`), nil
+		default:
+			return nil, fmt.Errorf("unexpected gh %v", args)
+		}
+	}}
+	open, err := GitHubPRs{GitHub: g}.ListOpen(context.Background())
+	if err != nil || len(open) != 1 {
+		t.Fatalf("open %+v %v", open, err)
+	}
+	if len(open[0].LinkedIssue) != 1 || open[0].LinkedIssue[0] != 10 {
+		t.Fatalf("body fallback linked %+v", open[0].LinkedIssue)
 	}
 }
 

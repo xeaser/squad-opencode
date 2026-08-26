@@ -82,19 +82,17 @@ func (g GitHubPRs) closingIssues(ctx context.Context, n int) []int {
 	}
 	var wrap struct {
 		Body                    string `json:"body"`
-		ClosingIssuesReferences struct {
-			Nodes []struct {
-				Number int `json:"number"`
-			} `json:"nodes"`
+		ClosingIssuesReferences []struct {
+			Number int `json:"number"`
 		} `json:"closingIssuesReferences"`
 	}
 	if err := json.Unmarshal(raw, &wrap); err != nil {
 		return parseBodyIssueRefs(string(raw))
 	}
 	var out []int
-	for _, node := range wrap.ClosingIssuesReferences.Nodes {
-		if node.Number > 0 {
-			out = append(out, node.Number)
+	for _, ref := range wrap.ClosingIssuesReferences {
+		if ref.Number > 0 {
+			out = append(out, ref.Number)
 		}
 	}
 	if len(out) == 0 {
