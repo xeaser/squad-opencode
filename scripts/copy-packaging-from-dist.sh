@@ -4,6 +4,7 @@ set -euo pipefail
 DIST="${DIST:-dist}"
 REPO="${REPO:?REPO is required (owner/name)}"
 TAG="${TAG:?TAG is required (vX.Y.Z)}"
+ver="${TAG#v}"
 CATALOG="${DIST}/artifacts.json"
 
 if [[ ! -f "${CATALOG}" ]]; then
@@ -15,7 +16,7 @@ copy_one() {
   local typ="$1"
   local dest="$2"
   local path
-  path="$(jq -r --arg t "${typ}" '.[] | select(.type == $t) | .path' "${CATALOG}" | head -n 1)"
+  path="$(jq -r --arg t "${typ}" '.[] | select(.type == $t) | .path' "${CATALOG}" | head -n 1 | tr -d '\r')"
   if [[ -z "${path}" || "${path}" == "null" ]]; then
     echo "no artifact of type ${typ} in ${CATALOG}" >&2
     exit 1
@@ -25,28 +26,40 @@ copy_one() {
 }
 
 copy_one "Homebrew Cask" "Casks/squad-oc.rb"
+tmp="$(mktemp)"
+sed "s/#{version}/${ver}/g" Casks/squad-oc.rb > "${tmp}"
+mv "${tmp}" Casks/squad-oc.rb
 
-scoop_src="$(jq -r '.[] | select(.type == "Scoop Manifest") | .path' "${CATALOG}" | head -n 1)"
+scoop_src="$(jq -r '.[] | select(.type == "Scoop Manifest") | .path' "${CATALOG}" | head -n 1 | tr -d '\r')"
 if [[ -z "${scoop_src}" || "${scoop_src}" == "null" ]]; then
   echo "no Scoop Manifest in ${CATALOG}" >&2
   exit 1
 fi
 mkdir -p bucket
-hash_url="https://github.com/${REPO}/releases/download/${TAG}/checksums.txt"
-jq --arg url "${hash_url}" '
+hash_url="https://github.com/${REPO}/releases/download/v\$version/checksums.txt"
+jq --arg url "${hash_url}" --arg ver "${ver}" '
+  def pin_ver:
+    if test("squad-oc_[0-9]+\\.[0-9]+\\.[0-9]+_") then .
+    else sub("squad-oc_"; "squad-oc_" + $ver + "_")
+    end;
   .checkver = "github"
+  | .architecture["64bit"].url = ((.architecture["64bit"].url // "") | pin_ver)
   | .autoupdate.hash.url = $url
   | .autoupdate.architecture = (.autoupdate.architecture // .architecture)
-  | .autoupdate.architecture["64bit"].url = ((.architecture["64bit"].url // "") | gsub("_[0-9]+\\.[0-9]+\\.[0-9]+_"; "_$version_"))
+  | .autoupdate.architecture["64bit"].url = ((.architecture["64bit"].url // "")
+      | gsub("_[0-9]+\\.[0-9]+\\.[0-9]+_"; "_$version_")
+      | gsub("/v[0-9]+\\.[0-9]+\\.[0-9]+/"; "/v$version/"))
 ' "${scoop_src}" > bucket/squad-oc.json
 
-mapfile -t winget_paths < <(jq -r '.[] | select(.type == "Winget Manifest") | .path' "${CATALOG}")
-if [[ ${#winget_paths[@]} -eq 0 ]]; then
+mkdir -p packaging/winget
+rm -f packaging/winget/*.yaml
+copied=0
+while IFS= read -r p; do
+  [[ -z "${p}" ]] && continue
+  cp "${p}" "packaging/winget/$(basename "${p}")"
+  copied=1
+done < <(jq -r '.[] | select(.type == "Winget Manifest") | .path' "${CATALOG}" | tr -d '\r')
+if [[ "${copied}" -eq 0 ]]; then
   echo "no Winget Manifest artifacts" >&2
   exit 1
 fi
-mkdir -p packaging/winget
-rm -f packaging/winget/*.yaml
-for p in "${winget_paths[@]}"; do
-  cp "${p}" "packaging/winget/$(basename "${p}")"
-done

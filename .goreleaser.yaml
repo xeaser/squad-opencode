@@ -42,6 +42,7 @@ homebrew_casks:
     license: MIT
     binaries:
       - squad-oc
+    caveats: "Existing installs from this tap as a formula migrate via tap_migrations.json."
     skip_upload: true
     repository:
       owner: "{{ .Env.GITHUB_REPOSITORY_OWNER }}"
@@ -52,6 +53,7 @@ scoops:
     homepage: "https://github.com/xeaser/squad-opencode"
     description: "Human-led AI agent teams for OpenCode"
     license: MIT
+    url_template: "https://github.com/{{ .Env.GITHUB_REPOSITORY }}/releases/download/{{ .Tag }}/{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}.zip"
     skip_upload: true
     repository:
       owner: "{{ .Env.GITHUB_REPOSITORY_OWNER }}"

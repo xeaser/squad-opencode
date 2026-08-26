@@ -50,7 +50,7 @@ Do not force-push to the default branch. Do not rewrite published tags.
    ```
 
 4. The release workflow checks the tag is on `origin/main`, waits for `ci`, then GoReleaser publishes. It uses `.goreleaser.yaml` from `origin/main` so a config fix can retry the same tag.
-5. Approve the `chore: pin Homebrew, Scoop, and winget to vX.Y.Z` PR. Auto-merge lands it when `ci` is green if the repo allows it; otherwise merge after `ci`. Set repository secret `PACKAGING_BUMP_TOKEN` (fine-grained PAT or GitHub App, contents + pull-requests) so that PR can run `ci`. `upgrade --self` already works from the GitHub Release if the bump is delayed.
+5. The bump job writes the packaging branch with GraphQL `createCommitOnBranch` (one signed commit for every file; do not set `author`/`committer`). `GITHUB_TOKEN` is a GitHub App token, so GitHub signs it as `github-actions[bot]`. It opens the PR and starts `ci` via `workflow_dispatch`. Approve and squash-merge that PR when `ci` is green. `upgrade --self` already works from the GitHub Release if the bump is delayed.
 
 If the release job fails **before** a GitHub Release exists, do **not** tag the next version. Fix the config on `main`, then retry the **same tag**: Actions → release → Run workflow (`workflow_dispatch`). The job checks out that tag’s code and overlays `origin/main`’s `.goreleaser.yaml`.
 

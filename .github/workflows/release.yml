@@ -42,14 +42,14 @@ jobs:
           fi
       - name: Require previous stable tag has a GitHub Release
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git fetch origin main
           git show origin/main:scripts/require-previous-release.sh > "${RUNNER_TEMP}/require-previous-release.sh"
           bash "${RUNNER_TEMP}/require-previous-release.sh" "${RELEASE_TAG}"
       - name: Wait for ci on tagged commit
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -eu
           deadline=$((SECONDS + 1200))
@@ -106,22 +106,14 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      actions: write
     steps:
-      - name: Require bump token
-        env:
-          PACKAGING_BUMP_TOKEN: ${{ secrets.PACKAGING_BUMP_TOKEN }}
-        run: |
-          if [ -z "${PACKAGING_BUMP_TOKEN}" ]; then
-            echo "::error::set repository secret PACKAGING_BUMP_TOKEN (contents + pull-requests) so the bump PR can run ci"
-            exit 1
-          fi
       - name: Checkout main
         uses: actions/checkout@v7
         with:
           ref: main
           fetch-depth: 0
           persist-credentials: false
-          token: ${{ secrets.PACKAGING_BUMP_TOKEN }}
       - name: Download dist
         uses: actions/download-artifact@v4
         with:
@@ -135,7 +127,7 @@ jobs:
         run: bash scripts/copy-packaging-from-dist.sh
       - name: Open bump PR
         env:
-          GH_TOKEN: ${{ secrets.PACKAGING_BUMP_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ env.RELEASE_TAG }}
         run: |
           set -euo pipefail
@@ -145,31 +137,55 @@ jobs:
             echo "tag ${TAG} is not the newest stable tag (${newest}); skip packaging pin"
             exit 0
           fi
-          branch="chore/packaging-${TAG}"
-          gh auth setup-git
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout -B "${branch}"
           git add Casks/squad-oc.rb bucket/squad-oc.json packaging/winget tap_migrations.json
           git add -u Formula || true
           if git diff --cached --quiet; then
             echo "no packaging changes"
             exit 0
           fi
-          git commit -m "chore: pin Homebrew, Scoop, and winget to ${TAG}"
-          if ! git push -u origin "${branch}" --force; then
-            echo "::warning::could not push packaging branch (PACKAGING_BUMP_TOKEN push denied); release is published"
-            exit 0
+          branch="chore/packaging-${TAG}"
+          headline="chore: pin Homebrew, Scoop, and winget to ${TAG}"
+          oid=$(git rev-parse HEAD)
+          additions='[]'
+          deletions='[]'
+          while IFS=$'\t' read -r status path; do
+            case "${status}" in
+              D)
+                deletions=$(jq -c --arg p "${path}" '. + [{path:$p}]' <<<"${deletions}")
+                ;;
+              *)
+                additions=$(jq -c --arg p "${path}" --arg c "$(base64 -w0 "${path}")" '. + [{path:$p,contents:$c}]' <<<"${additions}")
+                ;;
+            esac
+          done < <(git diff --cached --name-status)
+          if ! gh api -X PATCH "repos/${GITHUB_REPOSITORY}/git/refs/heads/${branch}" -f sha="${oid}" -F force=true >/dev/null 2>&1; then
+            gh api "repos/${GITHUB_REPOSITORY}/git/refs" -f ref="refs/heads/${branch}" -f sha="${oid}" >/dev/null
           fi
-          pr=$(gh pr list --head "${branch}" --json number --jq '.[0].number')
-          if [ -z "${pr}" ] || [ "${pr}" = "null" ]; then
+          # shellcheck disable=SC2016 # $repo etc. are GraphQL variables, not shell
+          gh api graphql -f query='
+            mutation($repo:String!,$branch:String!,$oid:GitObjectID!,$headline:String!,$additions:[FileAddition!]!,$deletions:[FileDeletion!]!) {
+              createCommitOnBranch(input:{
+                branch:{repositoryNameWithOwner:$repo,branchName:$branch}
+                expectedHeadOid:$oid
+                message:{headline:$headline}
+                fileChanges:{additions:$additions,deletions:$deletions}
+              }) { commit { oid } }
+            }' \
+            -f repo="${GITHUB_REPOSITORY}" \
+            -f branch="${branch}" \
+            -f oid="${oid}" \
+            -f headline="${headline}" \
+            -F additions="${additions}" \
+            -F deletions="${deletions}"
+          pr=$(gh pr list --head "${branch}" --json number --jq '.[0].number // empty')
+          if [ -z "${pr}" ]; then
             gh pr create --base main --head "${branch}" \
-              --title "chore: pin Homebrew, Scoop, and winget to ${TAG}" \
-              --body "Auto-generated from ${TAG}. Approve to squash-merge when ci is green. Release: https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
-            pr=$(gh pr list --head "${branch}" --json number --jq '.[0].number')
+              --title "${headline}" \
+              --body "Auto-generated from ${TAG}. Approve and squash-merge when ci is green. Release: https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
+            pr=$(gh pr list --head "${branch}" --json number --jq '.[0].number // empty')
           fi
-          if gh pr merge --squash --auto "${pr}"; then
-            echo "auto-merge queued for ${pr}"
-          else
-            echo "::warning::auto-merge not enabled; approve ${pr} when ci is green"
+          if [ -z "${pr}" ]; then
+            echo "::error::could not open packaging PR; branch ${branch} exists"
+            exit 1
           fi
+          gh workflow run ci.yml --ref "${branch}"
