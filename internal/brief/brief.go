@@ -121,9 +121,38 @@ func Collect(ctx context.Context, opts Options) (Report, error) {
 		rep.Team.Members = append(rep.Team.Members, Member{Name: m.Name, Role: m.Role, Status: m.Status})
 	}
 
-	// Nil sources: soft-unavailable until Task 4 wires GitHub.
 	rep.PRs = SourceList[PR]{Error: "unavailable"}
 	rep.Tickets = SourceList[Ticket]{Error: "unavailable"}
+	if opts.PRs != nil {
+		open, err := opts.PRs.ListOpen(ctx)
+		if err != nil {
+			rep.PRs.Error = err.Error()
+		} else {
+			rep.PRs = SourceList[PR]{OK: true, Items: open}
+			rep.InProgress.PRs = open
+		}
+		merged, err := opts.PRs.ListMerged(ctx, 5)
+		if err != nil {
+			if rep.PRs.OK {
+				// open succeeded; last-done stays empty
+			} else {
+				rep.PRs.Error = err.Error()
+			}
+		} else {
+			rep.LastDone.PRs = merged
+		}
+	}
+	if opts.Tickets != nil {
+		items, err := opts.Tickets.ListOpen(ctx)
+		if err != nil {
+			rep.Tickets.Error = err.Error()
+		} else {
+			rep.Tickets = SourceList[Ticket]{OK: true, Items: items}
+		}
+	}
+	if rep.PRs.OK && rep.Tickets.OK {
+		rep.Next = pickNext(rep.Tickets.Items, rep.PRs.Items)
+	}
 
 	fillLocal(opts.ProjectRoot, &rep)
 	return rep, nil

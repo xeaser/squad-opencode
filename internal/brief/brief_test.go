@@ -138,6 +138,57 @@ func containsName(paths []string, name string) bool {
 	return false
 }
 
+type fakeTickets struct{ items []Ticket }
+
+func (f fakeTickets) ListOpen(context.Context) ([]Ticket, error) { return f.items, nil }
+
+type fakePRs struct {
+	open   []PR
+	merged []PR
+}
+
+func (f fakePRs) ListOpen(context.Context) ([]PR, error)       { return f.open, nil }
+func (f fakePRs) ListMerged(context.Context, int) ([]PR, error) { return f.merged, nil }
+
+func TestCollectGitHubNextSkipsLinked(t *testing.T) {
+	root := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	newer := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+	rep, err := Collect(context.Background(), Options{
+		ProjectRoot: root,
+		Tickets: fakeTickets{[]Ticket{
+			{Source: "github", ID: "#10", Number: 10, Title: "has PR", CreatedAt: old},
+			{Source: "github", ID: "#11", Number: 11, Title: "unstarted", CreatedAt: newer},
+		}},
+		PRs: fakePRs{
+			open:   []PR{{Number: 3, Title: "fix 10", Author: "a", LinkedIssue: []int{10}}},
+			merged: []PR{{Number: 2, Title: "shipped", MergedAt: "2026-08-01T00:00:00Z"}},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !rep.PRs.OK || len(rep.PRs.Items) != 1 || !rep.Tickets.OK {
+		t.Fatalf("%+v", rep)
+	}
+	if rep.Next == nil || rep.Next.Number != 11 {
+		t.Fatalf("next %+v", rep.Next)
+	}
+	if len(rep.LastDone.PRs) != 1 || rep.LastDone.PRs[0].Number != 2 {
+		t.Fatalf("last %+v", rep.LastDone)
+	}
+	text := Format(rep)
+	if strings.Contains(text, "unavailable") {
+		t.Fatalf("sources ok should not say unavailable:\n%s", text)
+	}
+	if !strings.Contains(text, "#11") || !strings.Contains(text, "unstarted") {
+		t.Fatalf("next missing:\n%s", text)
+	}
+}
+
 func TestPickNext(t *testing.T) {
 	t1 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	t2 := time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)
