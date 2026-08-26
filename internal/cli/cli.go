@@ -288,7 +288,12 @@ func cmdBrief(args []string) int {
 		fmt.Fprintln(os.Stderr, "Not initialized. Run: squad-oc init --preset default")
 		return 1
 	}
-	rep, err := brief.Collect(context.Background(), brief.Options{ProjectRoot: root})
+	gh := brief.GitHub{Dir: root}
+	rep, err := brief.Collect(context.Background(), brief.Options{
+		ProjectRoot: root,
+		Tickets:     brief.GitHubTickets{GitHub: gh},
+		PRs:         brief.GitHubPRs{GitHub: gh},
+	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
