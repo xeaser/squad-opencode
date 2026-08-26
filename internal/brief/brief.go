@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -73,9 +71,9 @@ type ReviewNeed struct {
 }
 
 type Report struct {
-	Team      Team               `json:"team"`
-	PRs       SourceList[PR]     `json:"prs"`
-	Tickets   SourceList[Ticket] `json:"tickets"`
+	Team       Team               `json:"team"`
+	PRs        SourceList[PR]     `json:"prs"`
+	Tickets    SourceList[Ticket] `json:"tickets"`
 	InProgress struct {
 		PRs           []PR     `json:"prs"`
 		DesignReviews []string `json:"designReviews"`
@@ -127,11 +125,6 @@ func Collect(ctx context.Context, opts Options) (Report, error) {
 	rep.PRs = SourceList[PR]{Error: "unavailable"}
 	rep.Tickets = SourceList[Ticket]{Error: "unavailable"}
 
-	cer := "ceremonies.md"
-	rep.Ceremonies.Path = cer
-	if st, err := os.Stat(filepath.Join(squad.ResolveDir(opts.ProjectRoot), cer)); err == nil && !st.IsDir() {
-		rep.Ceremonies.Present = true
-	}
 	fillLocal(opts.ProjectRoot, &rep)
 	return rep, nil
 }
@@ -164,10 +157,6 @@ func pickNext(issues []Ticket, prs []PR) *Ticket {
 		}
 	}
 	return best
-}
-
-func fillLocal(root string, _ *Report) {
-	// Task 2 fills comms / reviews / ralph. Task 1 only needs ceremonies present after init.
 }
 
 func Format(r Report) string {

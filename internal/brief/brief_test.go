@@ -3,6 +3,8 @@ package brief
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -65,6 +67,75 @@ func TestCollectTeamAndJSONKeys(t *testing.T) {
 			t.Fatalf("json missing %s: %s", k, raw)
 		}
 	}
+}
+
+func TestCollectLocalCommsRalphReviews(t *testing.T) {
+	root := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	comms := filepath.Join(squad.ResolveDir(root), "comms")
+	review := `## Handoff: tester → lead
+
+## Review
+
+- **Verdict:** reject
+- **Author:** backend
+- **Fix owner:** backend
+- **Reasons:** tests missing
+`
+	if err := os.WriteFile(filepath.Join(comms, "2026-08-26-tester-to-lead.md"), []byte(review), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(comms, "2026-08-26-auth-design-review.md"), []byte("## Design Review\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	accept := `## Review
+
+- **Verdict:** accept
+- **Author:** frontend
+- **Fix owner:** lead
+`
+	if err := os.WriteFile(filepath.Join(comms, "2026-08-26-ok.md"), []byte(accept), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(squad.ResolveDir(root), "ralph-status.json"), []byte(`{
+  "lastSummary": "polled 2 issues",
+  "lastError": "timeout",
+  "overnight": true
+}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(squad.ResolveDir(root), "ralph-stop"), []byte(""), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	rep, err := Collect(context.Background(), Options{ProjectRoot: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !containsName(rep.InProgress.DesignReviews, "2026-08-26-auth-design-review.md") {
+		t.Fatalf("design reviews: %v", rep.InProgress.DesignReviews)
+	}
+	if len(rep.NeedsYou) != 1 || !rep.NeedsYou[0].SameOwner {
+		t.Fatalf("needs you: %+v", rep.NeedsYou)
+	}
+	if !rep.Ralph.Present || !strings.Contains(rep.Ralph.LastSummary, "polled") || !rep.Ralph.Stop || !rep.Ralph.Overnight {
+		t.Fatalf("ralph: %+v", rep.Ralph)
+	}
+	text := Format(rep)
+	if !strings.Contains(text, "FLAG author==fix-owner") {
+		t.Fatalf("flag missing:\n%s", text)
+	}
+}
+
+func containsName(paths []string, name string) bool {
+	for _, p := range paths {
+		if strings.HasSuffix(p, name) {
+			return true
+		}
+	}
+	return false
 }
 
 func TestPickNext(t *testing.T) {
