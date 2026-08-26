@@ -4,7 +4,7 @@ PackageIdentifier: xeaser.squad-oc
 PackageVersion: 0.6.0
 InstallerLocale: en-US
 InstallerType: zip
-ReleaseDate: "2026-08-25"
+ReleaseDate: "2026-08-26"
 Installers:
   - Architecture: x64
     NestedInstallerType: portable
@@ -12,7 +12,7 @@ Installers:
       - RelativeFilePath: squad-oc.exe
         PortableCommandAlias: squad-oc
     InstallerUrl: https://github.com/xeaser/squad-opencode/releases/download/v0.6.0/squad-oc_0.6.0_windows_amd64.zip
-    InstallerSha256: 8feb36490882ad0b9ef1fb38ad8518d4168ff64c7779713103c24b5e96741a2c
+    InstallerSha256: f9fa6c00c005401b41a2b23dd8427fedfcc15fc218409e8fc26f40a194551d84
     UpgradeBehavior: uninstallPrevious
 ManifestType: installer
 ManifestVersion: 1.12.0
