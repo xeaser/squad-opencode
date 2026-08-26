@@ -51,13 +51,15 @@ jq --arg url "${hash_url}" --arg ver "${ver}" '
       | gsub("/v[0-9]+\\.[0-9]+\\.[0-9]+/"; "/v$version/"))
 ' "${scoop_src}" > bucket/squad-oc.json
 
-mapfile -t winget_paths < <(jq -r '.[] | select(.type == "Winget Manifest") | .path' "${CATALOG}" | tr -d '\r')
-if [[ ${#winget_paths[@]} -eq 0 ]]; then
+mkdir -p packaging/winget
+rm -f packaging/winget/*.yaml
+copied=0
+while IFS= read -r p; do
+  [[ -z "${p}" ]] && continue
+  cp "${p}" "packaging/winget/$(basename "${p}")"
+  copied=1
+done < <(jq -r '.[] | select(.type == "Winget Manifest") | .path' "${CATALOG}" | tr -d '\r')
+if [[ "${copied}" -eq 0 ]]; then
   echo "no Winget Manifest artifacts" >&2
   exit 1
 fi
-mkdir -p packaging/winget
-rm -f packaging/winget/*.yaml
-for p in "${winget_paths[@]}"; do
-  cp "${p}" "packaging/winget/$(basename "${p}")"
-done

@@ -161,6 +161,7 @@ jobs:
           if ! gh api -X PATCH "repos/${GITHUB_REPOSITORY}/git/refs/heads/${branch}" -f sha="${oid}" -F force=true >/dev/null 2>&1; then
             gh api "repos/${GITHUB_REPOSITORY}/git/refs" -f ref="refs/heads/${branch}" -f sha="${oid}" >/dev/null
           fi
+          # shellcheck disable=SC2016 # $repo etc. are GraphQL variables, not shell
           gh api graphql -f query='
             mutation($repo:String!,$branch:String!,$oid:GitObjectID!,$headline:String!,$additions:[FileAddition!]!,$deletions:[FileDeletion!]!) {
               createCommitOnBranch(input:{
