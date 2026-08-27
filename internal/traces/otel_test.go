@@ -210,7 +210,7 @@ func TestExporterKindGRPC(t *testing.T) {
 func attrMap(kvs []attribute.KeyValue) map[string]string {
 	m := make(map[string]string, len(kvs))
 	for _, kv := range kvs {
-		m[string(kv.Key)] = kv.Value.Emit()
+		m[string(kv.Key)] = kv.Value.String()
 	}
 	return m
 }
