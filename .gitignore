@@ -33,6 +33,8 @@ squad-export.json
 .env
 .env.*
 !.env.example
+# Local-only Langfuse init keys (not production); needed for live-traces.ps1
+!scripts/langfuse/.env
 *.pem
 *.key
 
