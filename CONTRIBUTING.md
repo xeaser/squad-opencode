@@ -22,15 +22,23 @@ go build -o squad-oc ./cmd/squad-oc
 Or, with [Task](https://taskfile.dev) (`go install github.com/go-task/task/v3/cmd/task@latest`):
 
 ```bash
-task            # list
-task test       # go test ./...
-task ci         # local CI gate (fmt/vet/lint/race/build/vuln/actionlint)
-task tools      # install golangci-lint, govulncheck, actionlint
+task                 # list
+task test            # go test ./...
+task build           # go build -o squad-oc[.exe]
+task ci              # local CI gate (fmt/vet/lint/race/build/vuln/actionlint)
+task tools           # install lint/vuln/actionlint/goreleaser
+task release:check   # validate .goreleaser.yaml
+task release         # GoReleaser snapshot into dist/ (no tag, no publish)
+task bump TAG=vX.Y.Z # pin Homebrew/Scoop/winget from dist/ (no PR)
+task release:tag TAG=vX.Y.Z   # annotated tag on main only (no push)
+task release:push TAG=vX.Y.Z  # push tag; GitHub release workflow publishes
 task langfuse:up
 task langfuse:down
 task live:e2e
 task live:traces
 ```
+
+Do not edit `internal/version/version.go` to bump. Do not tag a feature branch.
 
 Requires **Go 1.26.6+**. Optional live checks (dummy project only, never this clone as the serve cwd unless you mean to dogfood):
 

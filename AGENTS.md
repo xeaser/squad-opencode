@@ -157,7 +157,7 @@ go test ./...
 go build -o squad-oc.exe ./cmd/squad-oc
 ```
 
-Prefer Task when it is on PATH (`task --list`): `task test`, `task ci` (fmt/vet/lint/race/build/vuln/actionlint), `task langfuse:up` / `task langfuse:down`, `task live:e2e` / `task live:traces`. Do not use this git clone as the live serve cwd.
+Prefer Task when it is on PATH (`task --list`): `task test`, `task build`, `task ci`, `task release` (snapshot only), `task bump TAG=vX.Y.Z`, `task langfuse:up` / `task langfuse:down`, `task live:e2e` / `task live:traces`. Real publish is `task release:tag TAG=vX.Y.Z` on main then `task release:push`. Do not edit `internal/version/version.go`. Do not use this git clone as the live serve cwd.
 
 Live OpenCode HTTP checks need a running `opencode serve` and use the `live` build tag.
 
