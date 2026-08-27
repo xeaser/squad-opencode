@@ -53,7 +53,7 @@ Inside OpenCode:
 3. Paste your API key
 4. Quit when done
 
-Optional: pin a seat to an OpenCode id (`provider/model-id`) with `squad-oc cast --model squad xai/grok-3` or `cast --add NAME --model anthropic/claude-sonnet-4-5`. Empty cells inherit the Squad model, then the session default. This does not write `opencode.json`.
+Optional: pin a seat to an OpenCode id (`provider/model-id`) with `squad-oc cast --model squad opencode/big-pickle` or `cast --add NAME --model opencode/hy3-free`. Use an id from `opencode models` on this machine — `xai/…` and `anthropic/…` only work after `/connect` for that provider. Empty cells inherit the Squad model, then the session default. This does not write `opencode.json`.
 
 ---
 

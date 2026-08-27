@@ -12,6 +12,7 @@ $RepoRoot = Split-Path -Parent $PSScriptRoot
 $Dummy = "D:\xAI\squad-oc-dummy"
 $BaseURL = "http://127.0.0.1:4096"
 $LangfuseURL = "http://127.0.0.1:3000"
+$SquadModel = "opencode/big-pickle"
 $Prompt = "Reply with exactly TRACEOK and nothing else."
 $LangfusePrompt = "Reply with exactly LANGFUSEOK and nothing else."
 $Log = Join-Path $Dummy "live-traces.log"
@@ -262,6 +263,10 @@ try {
         } else {
             Write-Log "already initialized"
         }
+
+        # Pin a model this OpenCode instance actually has. xai/* / anthropic/*
+        # 500 when those providers are not configured (opencode models lists opencode/* only).
+        Invoke-SquadOc -Exe $exe -CommandArgs @("cast", "--model", "squad", $SquadModel)
 
         $opencodeExe = Get-OpencodeExe
         Write-Log "opencode=$opencodeExe"
