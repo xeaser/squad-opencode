@@ -1,10 +1,9 @@
-# https://taskfile.dev — local CI + Langfuse/live helpers.
+# https://taskfile.dev — local CI, release, and live dummy helpers.
 # Install: go install github.com/go-task/task/v3/cmd/task@latest
 version: "3"
 
 vars:
   BINARY: '{{if eq OS "windows"}}squad-oc.exe{{else}}squad-oc{{end}}'
-  COMPOSE: scripts/langfuse/docker-compose.yml
   PWSH: '{{if eq OS "windows"}}powershell{{else}}pwsh{{end}}'
 
 tasks:
@@ -111,35 +110,10 @@ tasks:
     desc: Local CI gate matching .github/workflows/ci.yml
     deps: [fmt:check, vet, lint, test:race, build, vuln, actionlint]
 
-  langfuse:up:
-    desc: Start local Langfuse v4 on 127.0.0.1:3000
-    cmds:
-      - docker compose -f {{.COMPOSE}} up -d
-
-  langfuse:down:
-    desc: Stop local Langfuse (keeps volumes)
-    cmds:
-      - docker compose -f {{.COMPOSE}} down
-
-  langfuse:down:volumes:
-    desc: Stop local Langfuse and remove squad-oc-langfuse-* volumes
-    cmds:
-      - docker compose -f {{.COMPOSE}} down -v
-
   live:e2e:
     desc: Dummy PONG check (D:\xAI\squad-oc-dummy only)
     cmds:
       - "{{.PWSH}} -File scripts/live-e2e.ps1"
-
-  live:traces:
-    desc: Dummy traces + optional local Langfuse OTLP
-    cmds:
-      - "{{.PWSH}} -File scripts/live-traces.ps1"
-
-  live:traces:skip-langfuse:
-    desc: Dummy traces only (no Langfuse)
-    cmds:
-      - "{{.PWSH}} -File scripts/live-traces.ps1 -SkipLangfuse"
 
   live:models:
     desc: Dummy per-agent model pin check

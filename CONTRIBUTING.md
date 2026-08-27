@@ -32,10 +32,8 @@ task release         # GoReleaser snapshot into dist/ (no tag, no publish)
 task bump TAG=vX.Y.Z # pin Homebrew/Scoop/winget from dist/ (no PR)
 task release:tag TAG=vX.Y.Z   # annotated tag on main only (no push)
 task release:push TAG=vX.Y.Z  # push tag; GitHub release workflow publishes
-task langfuse:up
-task langfuse:down
 task live:e2e
-task live:traces
+task live:models
 ```
 
 Do not edit `internal/version/version.go` to bump. Do not tag a feature branch.
@@ -44,11 +42,9 @@ Requires **Go 1.26.6+**. Optional live checks (dummy project only, never this cl
 
 ```powershell
 ./scripts/live-e2e.ps1
-./scripts/live-traces.ps1
-# same as: task live:e2e / task live:traces
 ```
 
-`live-e2e.ps1` talks to `opencode serve` on `127.0.0.1:4096` (doctor + PONG). `live-traces.ps1` exercises JSONL spans and optional local Langfuse OTLP ingest. The TUI (`opencode`) is not the API. CI stays `go test ./...` without live env. `task ci` is the local mirror of `.github/workflows/ci.yml`.
+`live-e2e.ps1` talks to `opencode serve` on `127.0.0.1:4096` (doctor + PONG). The TUI (`opencode`) is not the API. CI stays `go test ./...` without live env. `task ci` is the local mirror of `.github/workflows/ci.yml`.
 
 ## Branch and PR
 
