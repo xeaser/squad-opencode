@@ -1,6 +1,9 @@
 package traces
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 // RecordInput is the shared parent+child builder used by run and watch.
 type RecordInput struct {
@@ -83,4 +86,28 @@ func Build(in RecordInput) (parent Span, child *Span) {
 		Completion:       in.Completion,
 	}
 	return parent, &c
+}
+
+// Write appends parent (and child if non-nil) when projectRoot != "".
+// If s.Endpoint != "" it then calls push (default Push). The push error is
+// returned so callers can log one stderr line and ignore it for command status.
+func Write(projectRoot string, in RecordInput, s Settings, push func(context.Context, Settings, Span, *Span) error) error {
+	parent, child := Build(in)
+	if projectRoot != "" {
+		if err := Append(projectRoot, parent); err != nil {
+			return err
+		}
+		if child != nil {
+			if err := Append(projectRoot, *child); err != nil {
+				return err
+			}
+		}
+	}
+	if s.Endpoint == "" {
+		return nil
+	}
+	if push == nil {
+		push = Push
+	}
+	return push(context.Background(), s, parent, child)
 }

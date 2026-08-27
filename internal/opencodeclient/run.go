@@ -3,27 +3,38 @@ package opencodeclient
 import (
 	"context"
 	"fmt"
+	"math"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/sst/opencode-sdk-go"
+	"github.com/xeaser/squad-opencode/internal/squad"
 	"github.com/xeaser/squad-opencode/internal/traces"
 )
 
 // RunRequest is a non-interactive prompt.
 type RunRequest struct {
-	Directory string
-	Agent     string
-	Prompt    string
-	Title     string
+	Directory  string
+	Agent      string
+	Prompt     string
+	Title      string
+	SkipRecord bool
 }
 
 // RunResult is the assistant text from a session.
 type RunResult struct {
-	SessionID string
-	Text      string
+	SessionID                                                                     string
+	Text                                                                          string
+	HasGeneration                                                                 bool
+	Provider, Model                                                               string
+	InputTokens, OutputTokens, ReasoningTokens, CacheReadTokens, CacheWriteTokens int
+	Cost                                                                          float64
 }
+
+// pushOTLP is the OTel export hook. Tests replace it with a failing func.
+var pushOTLP = traces.Push
 
 // Runner creates a session and sends a prompt.
 type Runner interface {
@@ -39,7 +50,9 @@ type SDKRunner struct {
 func (r SDKRunner) Run(ctx context.Context, req RunRequest) (RunResult, error) {
 	start := time.Now()
 	res, err := r.run(ctx, req)
-	recordRun(req, start, err)
+	if !req.SkipRecord {
+		recordRun(req, start, err, res)
+	}
 	return res, err
 }
 
@@ -92,31 +105,50 @@ func (r SDKRunner) run(ctx context.Context, req RunRequest) (RunResult, error) {
 			}
 		}
 	}
-	return RunResult{SessionID: sess.ID, Text: b.String()}, nil
+	res := RunResult{SessionID: sess.ID, Text: b.String(), HasGeneration: true}
+	if resp != nil {
+		res.Provider = resp.Info.ProviderID
+		res.Model = resp.Info.ModelID
+		res.Cost = resp.Info.Cost
+		res.InputTokens = int(math.Round(resp.Info.Tokens.Input))
+		res.OutputTokens = int(math.Round(resp.Info.Tokens.Output))
+		res.ReasoningTokens = int(math.Round(resp.Info.Tokens.Reasoning))
+		res.CacheReadTokens = int(math.Round(resp.Info.Tokens.Cache.Read))
+		res.CacheWriteTokens = int(math.Round(resp.Info.Tokens.Cache.Write))
+		if res.SessionID == "" {
+			res.SessionID = resp.Info.SessionID
+		}
+	}
+	return res, nil
 }
 
-func recordRun(req RunRequest, start time.Time, runErr error) {
-	if req.Directory == "" {
-		return
+func recordRun(req RunRequest, start time.Time, runErr error, res RunResult) {
+	s, err := traces.ResolveSettings(squad.Detect(req.Directory).Config, os.Getenv)
+	if err != nil {
+		s = traces.Settings{}
 	}
-	agent := req.Agent
-	if agent == "" {
-		agent = "squad"
+	if err := traces.Write(req.Directory, traces.RecordInput{
+		ParentName:       "squad-oc.run",
+		Start:            start,
+		End:              time.Now(),
+		Err:              runErr,
+		Agent:            req.Agent,
+		Prompt:           req.Prompt,
+		Completion:       res.Text,
+		SessionID:        res.SessionID,
+		Attrs:            map[string]string{"prompt_bytes": strconv.Itoa(len(req.Prompt))},
+		HasGeneration:    res.HasGeneration,
+		Provider:         res.Provider,
+		Model:            res.Model,
+		InputTokens:      res.InputTokens,
+		OutputTokens:     res.OutputTokens,
+		ReasoningTokens:  res.ReasoningTokens,
+		CacheReadTokens:  res.CacheReadTokens,
+		CacheWriteTokens: res.CacheWriteTokens,
+		Cost:             res.Cost,
+	}, s, pushOTLP); err != nil {
+		fmt.Fprintln(os.Stderr, "traces: otlp push:", err)
 	}
-	status := "OK"
-	if runErr != nil {
-		status = "ERROR"
-	}
-	_ = traces.Append(req.Directory, traces.Span{
-		Name:   "squad-oc.run",
-		Start:  start,
-		End:    time.Now(),
-		Status: status,
-		Attributes: map[string]string{
-			"agent":        agent,
-			"prompt_bytes": strconv.Itoa(len(req.Prompt)),
-		},
-	})
 }
 
 // FakeRunner records calls for tests.
@@ -136,5 +168,5 @@ func (f *FakeRunner) Run(_ context.Context, req RunRequest) (RunResult, error) {
 	if text == "" {
 		text = "ok: " + req.Prompt
 	}
-	return RunResult{SessionID: "fake-session", Text: text}, nil
+	return RunResult{SessionID: "fake-session", Text: text, HasGeneration: true}, nil
 }

@@ -123,6 +123,22 @@ func TestRunRequiresPrompt(t *testing.T) {
 	}
 }
 
+func TestRunWatchBadOTLPProtocolExit2(t *testing.T) {
+	root := t.TempDir()
+	prev, _ := os.Getwd()
+	if err := os.Chdir(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(prev) })
+	t.Setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "http/json")
+	if Execute([]string{"run", "-p", "hi"}) != 2 {
+		t.Fatal("run bad protocol should be 2 before work")
+	}
+	if Execute([]string{"watch", "--once"}) != 2 {
+		t.Fatal("watch bad protocol should be 2 before work")
+	}
+}
+
 func TestTracesCLI(t *testing.T) {
 	root := t.TempDir()
 	prev, _ := os.Getwd()

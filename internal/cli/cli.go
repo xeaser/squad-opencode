@@ -593,6 +593,10 @@ func cmdRun(args []string) int {
 	if code != 0 {
 		return code
 	}
+	if _, err := traces.ResolveSettings(squad.Detect(root).Config, os.Getenv); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 2
+	}
 	ensured, code := ensureAPI(apiURL, root)
 	if code != 0 {
 		return code
@@ -670,6 +674,10 @@ func cmdWatch(args []string) int {
 	root, code := cwd()
 	if code != 0 {
 		return code
+	}
+	if _, err := traces.ResolveSettings(squad.Detect(root).Config, os.Getenv); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 2
 	}
 	backend, err := watch.ParseStateBackend(stateBackend, root)
 	if err != nil {

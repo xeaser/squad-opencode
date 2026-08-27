@@ -55,6 +55,44 @@ func TestPushEmptyEndpointNoop(t *testing.T) {
 	}
 }
 
+func TestWriteAppendsAndReturnsPushError(t *testing.T) {
+	root := t.TempDir()
+	start := time.Date(2026, 8, 27, 16, 0, 0, 0, time.UTC)
+	pushErr := errors.New("collector down")
+	err := Write(root, RecordInput{
+		ParentName:    "squad-oc.run",
+		Start:         start,
+		End:           start.Add(time.Millisecond),
+		Agent:         "lead",
+		Prompt:        "hi",
+		Completion:    "yo",
+		SessionID:     "ses_1",
+		HasGeneration: true,
+		Model:         "grok-4",
+	}, Settings{Endpoint: "http://127.0.0.1:1"}, func(context.Context, Settings, Span, *Span) error {
+		return pushErr
+	})
+	if !errors.Is(err, pushErr) {
+		t.Fatalf("want push error, got %v", err)
+	}
+	spans, err := List(root, 10)
+	if err != nil || len(spans) != 2 {
+		t.Fatalf("JSONL %+v %v", spans, err)
+	}
+	if spans[0].Name != "squad-oc.run" || spans[1].Name != NameChat {
+		t.Fatalf("%+v", spans)
+	}
+
+	empty := t.TempDir()
+	if err := Write(empty, RecordInput{ParentName: "squad-oc.run"}, Settings{}, nil); err != nil {
+		t.Fatal(err)
+	}
+	spans, err = List(empty, 10)
+	if err != nil || len(spans) != 1 {
+		t.Fatalf("no-endpoint still JSONL: %+v %v", spans, err)
+	}
+}
+
 func TestRecordToSpanRecorderTypedAttrs(t *testing.T) {
 	rec := tracetest.NewSpanRecorder()
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(rec))
