@@ -1,12 +1,12 @@
 {
-  "version": "0.7.0",
+  "version": "0.8.0",
   "architecture": {
     "64bit": {
-      "url": "https://github.com/xeaser/squad-opencode/releases/download/v0.7.0/squad-oc_0.7.0_windows_amd64.zip",
+      "url": "https://github.com/xeaser/squad-opencode/releases/download/v0.8.0/squad-oc_0.8.0_windows_amd64.zip",
       "bin": [
         "squad-oc.exe"
       ],
-      "hash": "ea764b69504e33c7a6ca05638f34a2379ea83a857d9e00105b02e3399992726b"
+      "hash": "6a716983eab5ac36f85d3ae0a0d23442c3c4cc3a8dd8760dbb40b64c1f8848bf"
     }
   },
   "homepage": "https://github.com/xeaser/squad-opencode",
@@ -23,7 +23,7 @@
         "bin": [
           "squad-oc.exe"
         ],
-        "hash": "ea764b69504e33c7a6ca05638f34a2379ea83a857d9e00105b02e3399992726b"
+        "hash": "6a716983eab5ac36f85d3ae0a0d23442c3c4cc3a8dd8760dbb40b64c1f8848bf"
       }
     }
   }
