@@ -47,6 +47,7 @@ func TestWriteDefaultPreset(t *testing.T) {
 		".opencode/commands/squad-status.md",
 		".opencode/commands/squad-cast.md",
 		".opencode/commands/squad-review.md",
+		".opencode/commands/squad-brief.md",
 		".opencode/.gitignore",
 		"opencode.json",
 	}

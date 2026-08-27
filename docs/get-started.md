@@ -125,7 +125,7 @@ squad-oc init --preset default --description "Recipe sharing app with React and 
 - `.squad/` — team state  
 - `.opencode/agents/` — `squad` + role subagents  
 - `.opencode/skills/` — team + handoff  
-- `.opencode/commands/` — `/squad-status`, `/squad-cast`  
+- `.opencode/commands/` — `/squad-status`, `/squad-cast`, `/squad-brief`  
 - `.opencode/.gitignore` — ignores OpenCode’s local `node_modules` / lockfiles  
 - `opencode.json` — only if missing  
 
@@ -184,6 +184,7 @@ The script builds `squad-oc.exe`, inits `D:\xAI\squad-oc-dummy` if needed, start
 - `squad-oc import snapshot.json --with-host` restores `.squad/` plus host agents
 - `squad-oc link ~/teams/platform` (or a `git@` / `https` URL) to share one `.squad/` (`link --sync` / `link --off`)
 - `squad-oc watch --health` prints the last Ralph snapshot
+- `squad-oc brief` prints the morning listing (PRs, tickets, last done, next). Soft if `gh` is missing.
 - `squad-oc watch --execute --overnight-start 18:00 --overnight-end 08:00`
 - `squad-oc traces` lists local run/watch spans (`--export` writes OTLP JSON)
 - `squad-oc run -p "…"` starts `opencode serve` on `127.0.0.1:4096` if nothing is there; a custom `--url` never auto-starts
