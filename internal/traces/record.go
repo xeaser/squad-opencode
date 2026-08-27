@@ -2,6 +2,7 @@ package traces
 
 import (
 	"context"
+	"fmt"
 	"time"
 )
 
@@ -89,17 +90,17 @@ func Build(in RecordInput) (parent Span, child *Span) {
 }
 
 // Write appends parent (and child if non-nil) when projectRoot != "".
-// If s.Endpoint != "" it then calls push (default Push). The push error is
-// returned so callers can log one stderr line and ignore it for command status.
+// If s.Endpoint != "" it then calls push (default Push). Errors are wrapped
+// as "append: …" or "otlp push: …" so callers can log one stderr line.
 func Write(projectRoot string, in RecordInput, s Settings, push func(context.Context, Settings, Span, *Span) error) error {
 	parent, child := Build(in)
 	if projectRoot != "" {
 		if err := Append(projectRoot, parent); err != nil {
-			return err
+			return fmt.Errorf("append: %w", err)
 		}
 		if child != nil {
 			if err := Append(projectRoot, *child); err != nil {
-				return err
+				return fmt.Errorf("append: %w", err)
 			}
 		}
 	}
@@ -109,5 +110,8 @@ func Write(projectRoot string, in RecordInput, s Settings, push func(context.Con
 	if push == nil {
 		push = Push
 	}
-	return push(context.Background(), s, parent, child)
+	if err := push(context.Background(), s, parent, child); err != nil {
+		return fmt.Errorf("otlp push: %w", err)
+	}
+	return nil
 }

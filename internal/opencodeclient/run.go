@@ -33,7 +33,7 @@ type RunResult struct {
 	Cost                                                                          float64
 }
 
-// pushOTLP is the OTel export hook. Tests replace it with a failing func.
+// pushOTLP is the OTel export hook. TestMain no-ops it; collector-down tests replace it.
 var pushOTLP = traces.Push
 
 // Runner creates a session and sends a prompt.
@@ -147,7 +147,7 @@ func recordRun(req RunRequest, start time.Time, runErr error, res RunResult) {
 		CacheWriteTokens: res.CacheWriteTokens,
 		Cost:             res.Cost,
 	}, s, pushOTLP); err != nil {
-		fmt.Fprintln(os.Stderr, "traces: otlp push:", err)
+		fmt.Fprintln(os.Stderr, "traces:", err)
 	}
 }
 

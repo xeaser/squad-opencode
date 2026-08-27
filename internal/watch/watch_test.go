@@ -15,6 +15,15 @@ import (
 	"github.com/xeaser/squad-opencode/internal/traces"
 )
 
+func TestMain(m *testing.M) {
+	pushOTLP = func(context.Context, traces.Settings, traces.Span, *traces.Span) error {
+		return nil
+	}
+	_ = os.Unsetenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	_ = os.Unsetenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")
+	os.Exit(m.Run())
+}
+
 func TestBuildContextAndPass(t *testing.T) {
 	root := t.TempDir()
 	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {

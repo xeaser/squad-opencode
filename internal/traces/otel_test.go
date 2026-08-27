@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -75,6 +77,9 @@ func TestWriteAppendsAndReturnsPushError(t *testing.T) {
 	if !errors.Is(err, pushErr) {
 		t.Fatalf("want push error, got %v", err)
 	}
+	if !strings.Contains(err.Error(), "otlp push:") {
+		t.Fatalf("want otlp push wrap, got %v", err)
+	}
 	spans, err := List(root, 10)
 	if err != nil || len(spans) != 2 {
 		t.Fatalf("JSONL %+v %v", spans, err)
@@ -90,6 +95,17 @@ func TestWriteAppendsAndReturnsPushError(t *testing.T) {
 	spans, err = List(empty, 10)
 	if err != nil || len(spans) != 1 {
 		t.Fatalf("no-endpoint still JSONL: %+v %v", spans, err)
+	}
+}
+
+func TestWriteWrapsAppendError(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, ".squad"), []byte("not-a-dir"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	err := Write(root, RecordInput{ParentName: "squad-oc.run"}, Settings{}, nil)
+	if err == nil || !strings.Contains(err.Error(), "append:") {
+		t.Fatalf("want append wrap, got %v", err)
 	}
 }
 

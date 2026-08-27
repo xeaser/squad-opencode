@@ -16,7 +16,7 @@ import (
 	"github.com/xeaser/squad-opencode/internal/traces"
 )
 
-// pushOTLP is the OTel export hook. Tests replace it with a failing func.
+// pushOTLP is the OTel export hook. TestMain no-ops it; collector-down tests replace it.
 var pushOTLP = traces.Push
 
 // Issue is a work item (usually a GitHub issue).
@@ -327,7 +327,7 @@ func Pass(ctx context.Context, opts Options) (executed bool, summary string, err
 		CacheWriteTokens: res.CacheWriteTokens,
 		Cost:             res.Cost,
 	}, s, pushOTLP); werr != nil {
-		fmt.Fprintln(os.Stderr, "traces: otlp push:", werr)
+		fmt.Fprintln(os.Stderr, "traces:", werr)
 	}
 	if err != nil {
 		notify(opts, NotifyImportant, "execute error: "+err.Error())
