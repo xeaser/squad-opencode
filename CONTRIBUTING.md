@@ -19,13 +19,14 @@ go test ./...
 go build -o squad-oc ./cmd/squad-oc
 ```
 
-Requires **Go 1.26.6+**. Optional live check (dummy project only, never this clone as the serve cwd unless you mean to dogfood):
+Requires **Go 1.26.6+**. Optional live checks (dummy project only, never this clone as the serve cwd unless you mean to dogfood):
 
 ```powershell
 ./scripts/live-e2e.ps1
+./scripts/live-traces.ps1
 ```
 
-That talks to `opencode serve` on `127.0.0.1:4096`. The TUI (`opencode`) is not the API.
+`live-e2e.ps1` talks to `opencode serve` on `127.0.0.1:4096` (doctor + PONG). `live-traces.ps1` exercises JSONL spans and optional local Langfuse OTLP ingest. The TUI (`opencode`) is not the API. CI stays `go test ./...` without live env.
 
 ## Branch and PR
 

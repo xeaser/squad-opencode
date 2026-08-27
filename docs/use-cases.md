@@ -65,7 +65,7 @@ Matches README **Non-goals** (plus the memory MCP the roadmap refuses):
 |------------------------------|---------|
 | GitHub Copilot CLI / Copilot SDK | Different host. OpenCode TUI + `opencode serve`. |
 | Interactive Ink / `squad` shell | Use the OpenCode TUI. |
-| Aspire / .NET dashboard | `squad-oc traces` is local OTLP JSON, not Aspire. |
+| Aspire / .NET dashboard | Won’t ship a dashboard. Local JSONL + optional OTLP push; Aspire standalone can still consume OTLP. |
 | `squad_state` memory MCP | OpenCode + `.squad/` files remain memory. |
 
 Also not product features (workshop may mention them as **example** org MCP servers after P1): WorkIQ, Outlook COM, Teams Adaptive Cards.
@@ -101,7 +101,7 @@ Each original-Squad ease row is a **squad-oc command** you already ran, a **late
 | Snapshot team files | `export` / `import` |
 | Move team out of the worktree | `externalize` / `internalize` |
 | Context / PII hygiene | `nap` / `scrub-emails` |
-| Local spans | `squad-oc traces` |
+| Local spans / observability | `squad-oc traces` (`.squad/traces/spans.jsonl`) + optional OTLP push via `OTEL_EXPORTER_OTLP_ENDPOINT` |
 | Drop-in `mcp-config.json` | `squad-oc mcp init` / `apply` / `list` |
 | Marketplace browse + install | `squad-oc marketplace browse` / `install` |
 | Office / themed names | `squad-oc init --theme office` (native `@michael`) or later `cast --theme office` (mention map; `@lead` gone) |

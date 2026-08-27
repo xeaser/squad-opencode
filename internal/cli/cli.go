@@ -132,7 +132,7 @@ Commands:
   link --sync
   link --off
   update-check [--json] [--refresh]
-  traces [--last N] [--json] [--export file]
+  traces [--last N] [--json] [--export file]   # local spans.jsonl; OTEL_EXPORTER_OTLP_* optional push
   mcp apply | list | init
   marketplace add <name> <path|git-url> | list | remove <name> | browse [name] | install <plugin> [--from <name>]
   plugin install <name>@<marketplace> | list | uninstall <name>
