@@ -1,24 +1,30 @@
 {
-    "version": "0.6.0",
-    "description": "Human-led AI agent teams for OpenCode",
-    "homepage": "https://github.com/xeaser/squad-opencode",
-    "license": "MIT",
-    "architecture": {
-        "64bit": {
-            "url": "https://github.com/xeaser/squad-opencode/releases/download/v0.6.0/squad-oc_0.6.0_windows_amd64.zip",
-            "hash": "8feb36490882ad0b9ef1fb38ad8518d4168ff64c7779713103c24b5e96741a2c"
-        }
-    },
-    "bin": "squad-oc.exe",
-    "checkver": "github",
-    "autoupdate": {
-        "architecture": {
-            "64bit": {
-                "url": "https://github.com/xeaser/squad-opencode/releases/download/v$version/squad-oc_$version_windows_amd64.zip"
-            }
-        },
-        "hash": {
-            "url": "https://github.com/xeaser/squad-opencode/releases/download/v$version/checksums.txt"
-        }
+  "version": "0.7.0",
+  "architecture": {
+    "64bit": {
+      "url": "https://github.com/xeaser/squad-opencode/releases/download/v0.7.0/squad-oc_0.7.0_windows_amd64.zip",
+      "bin": [
+        "squad-oc.exe"
+      ],
+      "hash": "ea764b69504e33c7a6ca05638f34a2379ea83a857d9e00105b02e3399992726b"
     }
+  },
+  "homepage": "https://github.com/xeaser/squad-opencode",
+  "license": "MIT",
+  "description": "Human-led AI agent teams for OpenCode",
+  "checkver": "github",
+  "autoupdate": {
+    "hash": {
+      "url": "https://github.com/xeaser/squad-opencode/releases/download/v$version/checksums.txt"
+    },
+    "architecture": {
+      "64bit": {
+        "url": "https://github.com/xeaser/squad-opencode/releases/download/v$version/squad-oc_$version_windows_amd64.zip",
+        "bin": [
+          "squad-oc.exe"
+        ],
+        "hash": "ea764b69504e33c7a6ca05638f34a2379ea83a857d9e00105b02e3399992726b"
+      }
+    }
+  }
 }
