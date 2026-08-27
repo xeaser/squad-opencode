@@ -1,10 +1,9 @@
-# https://taskfile.dev — local CI, release, and live dummy helpers.
+# https://taskfile.dev — local CI and release helpers.
 # Install: go install github.com/go-task/task/v3/cmd/task@latest
 version: "3"
 
 vars:
   BINARY: '{{if eq OS "windows"}}squad-oc.exe{{else}}squad-oc{{end}}'
-  PWSH: '{{if eq OS "windows"}}powershell{{else}}pwsh{{end}}'
 
 tasks:
   default:
@@ -109,16 +108,6 @@ tasks:
   ci:
     desc: Local CI gate matching .github/workflows/ci.yml
     deps: [fmt:check, vet, lint, test:race, build, vuln, actionlint]
-
-  live:e2e:
-    desc: Dummy PONG check (D:\xAI\squad-oc-dummy only)
-    cmds:
-      - "{{.PWSH}} -File scripts/live-e2e.ps1"
-
-  live:models:
-    desc: Dummy per-agent model pin check
-    cmds:
-      - "{{.PWSH}} -File scripts/live-models.ps1"
 
   release:check:
     desc: Validate .goreleaser.yaml
