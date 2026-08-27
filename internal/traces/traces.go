@@ -16,15 +16,32 @@ import (
 	"github.com/xeaser/squad-opencode/internal/squad"
 )
 
+// NameChat is the OTel gen_ai operation span name for chat generations.
+const NameChat = "gen_ai.chat"
+
 // Span is a local recorded interval.
 type Span struct {
 	Name       string            `json:"name"`
 	TraceID    string            `json:"traceId"`
 	SpanID     string            `json:"spanId"`
+	ParentID   string            `json:"parentSpanId,omitempty"`
 	Start      time.Time         `json:"start"`
 	End        time.Time         `json:"end"`
 	Status     string            `json:"status"` // OK | ERROR
 	Attributes map[string]string `json:"attributes"`
+
+	SessionID        string  `json:"sessionId,omitempty"`
+	Agent            string  `json:"agent,omitempty"`
+	Provider         string  `json:"provider,omitempty"`
+	Model            string  `json:"model,omitempty"`
+	InputTokens      int     `json:"inputTokens,omitempty"`
+	OutputTokens     int     `json:"outputTokens,omitempty"`
+	ReasoningTokens  int     `json:"reasoningTokens,omitempty"`
+	CacheReadTokens  int     `json:"cacheReadTokens,omitempty"`
+	CacheWriteTokens int     `json:"cacheWriteTokens,omitempty"`
+	Cost             float64 `json:"cost,omitempty"`
+	Prompt           string  `json:"prompt,omitempty"`
+	Completion       string  `json:"completion,omitempty"`
 }
 
 // Dir is the traces folder under the resolved team directory.
@@ -113,15 +130,35 @@ func FormatTable(spans []Span) string {
 		return "(no traces)\n"
 	}
 	var b strings.Builder
-	b.WriteString("NAME\tSTATUS\tSTART\tDURATION\tATTRIBUTES\n")
+	b.WriteString("NAME\tSTATUS\tSTART\tDURATION\tMODEL\tTOKENS\tCOST\tATTRIBUTES\n")
+	var costSum float64
+	var inSum, outSum, chatSpans int
 	for _, s := range spans {
 		dur := s.End.Sub(s.Start)
 		if dur < 0 {
 			dur = 0
 		}
-		fmt.Fprintf(&b, "%s\t%s\t%s\t%s\t%s\n",
-			s.Name, s.Status, s.Start.UTC().Format(time.RFC3339), dur.Round(time.Millisecond), formatAttrs(s.Attributes))
+		model := s.Model
+		if model == "" {
+			model = "-"
+		}
+		tokens := "-"
+		if s.InputTokens != 0 || s.OutputTokens != 0 || s.Name == NameChat {
+			tokens = fmt.Sprintf("%d/%d", s.InputTokens, s.OutputTokens)
+		}
+		cost := "-"
+		if s.Name == NameChat {
+			cost = fmt.Sprintf("$%g", s.Cost)
+			costSum += s.Cost
+			inSum += s.InputTokens
+			outSum += s.OutputTokens
+			chatSpans++
+		}
+		fmt.Fprintf(&b, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+			s.Name, s.Status, s.Start.UTC().Format(time.RFC3339), dur.Round(time.Millisecond),
+			model, tokens, cost, formatAttrs(s.Attributes))
 	}
+	fmt.Fprintf(&b, "Cost: $%g  in=%d  out=%d  spans=%d\n", costSum, inSum, outSum, chatSpans)
 	return b.String()
 }
 
@@ -175,7 +212,7 @@ func toOTLPSpans(spans []Span) []otlpSpan {
 		if strings.EqualFold(s.Status, "ERROR") {
 			code = 2
 		}
-		attrs := make([]otlpKeyValue, 0, len(s.Attributes))
+		attrs := make([]otlpKeyValue, 0, len(s.Attributes)+12)
 		keys := make([]string, 0, len(s.Attributes))
 		for k := range s.Attributes {
 			keys = append(keys, k)
@@ -184,9 +221,11 @@ func toOTLPSpans(spans []Span) []otlpSpan {
 		for _, k := range keys {
 			attrs = append(attrs, stringAttr(k, s.Attributes[k]))
 		}
+		attrs = appendGenAIExportAttrs(attrs, s)
 		out = append(out, otlpSpan{
 			TraceID:           s.TraceID,
 			SpanID:            s.SpanID,
+			ParentSpanID:      s.ParentID,
 			Name:              s.Name,
 			Kind:              1,
 			StartTimeUnixNano: unixNanoString(s.Start),
@@ -196,6 +235,45 @@ func toOTLPSpans(spans []Span) []otlpSpan {
 		})
 	}
 	return out
+}
+
+// appendGenAIExportAttrs adds gen_ai.* metadata from first-class fields.
+// Never includes Prompt, Completion, or message payloads.
+func appendGenAIExportAttrs(attrs []otlpKeyValue, s Span) []otlpKeyValue {
+	if s.Name == NameChat {
+		attrs = append(attrs, stringAttr("gen_ai.operation.name", "chat"))
+	}
+	if s.Provider != "" {
+		attrs = append(attrs, stringAttr("gen_ai.provider.name", s.Provider))
+	}
+	if s.Model != "" {
+		attrs = append(attrs, stringAttr("gen_ai.request.model", s.Model))
+	}
+	if s.Agent != "" {
+		attrs = append(attrs, stringAttr("gen_ai.agent.name", s.Agent))
+	}
+	if s.SessionID != "" {
+		attrs = append(attrs, stringAttr("gen_ai.conversation.id", s.SessionID))
+	}
+	if s.InputTokens != 0 {
+		attrs = append(attrs, stringAttr("gen_ai.usage.input_tokens", fmt.Sprintf("%d", s.InputTokens)))
+	}
+	if s.OutputTokens != 0 {
+		attrs = append(attrs, stringAttr("gen_ai.usage.output_tokens", fmt.Sprintf("%d", s.OutputTokens)))
+	}
+	if s.ReasoningTokens != 0 {
+		attrs = append(attrs, stringAttr("gen_ai.usage.reasoning.output_tokens", fmt.Sprintf("%d", s.ReasoningTokens)))
+	}
+	if s.CacheReadTokens != 0 {
+		attrs = append(attrs, stringAttr("gen_ai.usage.cache_read.input_tokens", fmt.Sprintf("%d", s.CacheReadTokens)))
+	}
+	if s.CacheWriteTokens != 0 {
+		attrs = append(attrs, stringAttr("gen_ai.usage.cache_write.input_tokens", fmt.Sprintf("%d", s.CacheWriteTokens)))
+	}
+	if s.Name == NameChat {
+		attrs = append(attrs, stringAttr("gen_ai.usage.cost", fmt.Sprintf("%g", s.Cost)))
+	}
+	return attrs
 }
 
 func stringAttr(key, value string) otlpKeyValue {
@@ -239,6 +317,7 @@ type otlpScope struct {
 type otlpSpan struct {
 	TraceID           string         `json:"traceId"`
 	SpanID            string         `json:"spanId"`
+	ParentSpanID      string         `json:"parentSpanId,omitempty"`
 	Name              string         `json:"name"`
 	Kind              int            `json:"kind"`
 	StartTimeUnixNano string         `json:"startTimeUnixNano"`
