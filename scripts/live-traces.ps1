@@ -160,43 +160,77 @@ function Wait-LangfuseReady {
     throw "Langfuse at $LangfuseURL never became ready"
 }
 
-function Get-LangfuseTraces {
-    param([string]$B64)
-    # v4 removed GET /api/public/traces (404). Replacement is Observations API v2.
-    $urls = @(
-        "$LangfuseURL/api/public/traces?limit=20",
-        "$LangfuseURL/api/public/v2/observations?limit=20"
+function Invoke-LangfuseGet {
+    param(
+        [string]$Url,
+        [hashtable]$Headers
     )
-    $last = [ordered]@{ status = 0; body = $null; url = $null }
-    foreach ($url in $urls) {
-        try {
-            $r = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 10 -Headers @{
-                Authorization = "Basic $B64"
-            }
-            $got = [ordered]@{
-                url    = $url
-                status = [int]$r.StatusCode
-                body   = $r.Content
-            }
-            if ($got.status -ge 200 -and $got.status -lt 300 -and $got.body) {
-                return $got
-            }
-            $last = $got
-        } catch {
-            $status = 0
-            $resp = $_.Exception.Response
-            if ($null -ne $resp -and $null -ne $resp.StatusCode) {
-                $status = [int]$resp.StatusCode
-            }
-            $last = [ordered]@{
-                url    = $url
-                status = $status
-                body   = $null
-                error  = $_.Exception.Message
-            }
+    try {
+        $r = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 10 -Headers $Headers
+        return [ordered]@{
+            url    = $Url
+            status = [int]$r.StatusCode
+            body   = $r.Content
+        }
+    } catch {
+        $status = 0
+        $resp = $_.Exception.Response
+        if ($null -ne $resp -and $null -ne $resp.StatusCode) {
+            $status = [int]$resp.StatusCode
+        }
+        return [ordered]@{
+            url    = $Url
+            status = $status
+            body   = $null
+            error  = $_.Exception.Message
         }
     }
-    return $last
+}
+
+# This-run gate: both span names. LANGFUSEOK only if the payload actually has I/O fields.
+function Test-LangfuseThisRun {
+    param([string]$Body)
+    if ([string]::IsNullOrWhiteSpace($Body)) {
+        return $false
+    }
+    if ($Body -notlike "*squad-oc.run*" -or $Body -notlike "*gen_ai.chat*") {
+        return $false
+    }
+    $hasIO = ($Body -like "*gen_ai.input.messages*") -or
+        ($Body -like "*gen_ai.output.messages*") -or
+        ($Body -match '"input"\s*:') -or
+        ($Body -match '"output"\s*:')
+    if ($hasIO -and $Body -notlike "*LANGFUSEOK*") {
+        return $false
+    }
+    return $true
+}
+
+function Get-LangfuseTraces {
+    param(
+        [string]$B64,
+        [string]$FromStartTime
+    )
+    $headers = @{ Authorization = "Basic $B64" }
+    # Try legacy traces first (v4 events_only → 404). 2xx only counts if this-run markers match.
+    $tracesUrl = "$LangfuseURL/api/public/traces?limit=20"
+    $tracesGot = Invoke-LangfuseGet -Url $tracesUrl -Headers $headers
+    if ($tracesGot.status -ge 200 -and $tracesGot.status -lt 300 -and (Test-LangfuseThisRun $tracesGot.body)) {
+        return $tracesGot
+    }
+    # v4 replacement, windowed so leftover observations cannot match.
+    $obsUrl = "$LangfuseURL/api/public/v2/observations?limit=20"
+    if (-not [string]::IsNullOrWhiteSpace($FromStartTime)) {
+        $obsUrl = $obsUrl + "&fromStartTime=" + [uri]::EscapeDataString($FromStartTime)
+    }
+    $obsGot = Invoke-LangfuseGet -Url $obsUrl -Headers $headers
+    if ($obsGot.status -ge 200 -and $obsGot.status -lt 300 -and (Test-LangfuseThisRun $obsGot.body)) {
+        return $obsGot
+    }
+    if ($null -ne $obsGot.url) {
+        return $obsGot
+    }
+    return $tracesGot
 }
 
 try {
@@ -370,6 +404,9 @@ try {
             Remove-Item Env:OTEL_EXPORTER_OTLP_TRACES_ENDPOINT -ErrorAction SilentlyContinue
             Remove-Item Env:OTEL_EXPORTER_OTLP_TRACES_PROTOCOL -ErrorAction SilentlyContinue
 
+            $fromStart = (Get-Date).ToUniversalTime().AddSeconds(-2).ToString("yyyy-MM-ddTHH:mm:ssZ")
+            Write-Log "Langfuse poll window fromStartTime=$fromStart"
+
             $lfRunOut = ""
             $lfOk = $false
             for ($attempt = 1; $attempt -le 3; $attempt++) {
@@ -390,20 +427,17 @@ try {
             $got = $null
             $deadline = (Get-Date).AddSeconds(60)
             while ((Get-Date) -lt $deadline) {
-                $got = Get-LangfuseTraces -B64 $b64
+                $got = Get-LangfuseTraces -B64 $b64 -FromStartTime $fromStart
                 Write-Log ("GET {0} status={1}" -f $got.url, $got.status)
-                if ($got.status -ge 200 -and $got.status -lt 300 -and $got.body) {
-                    $hay = $got.body
-                    if ($hay -like "*squad-oc.run*" -or $hay -like "*LANGFUSEOK*" -or $hay -like "*gen_ai.chat*") {
-                        Write-Log "PASS Langfuse API found the run"
-                        break
-                    }
+                if ($got.status -ge 200 -and $got.status -lt 300 -and (Test-LangfuseThisRun $got.body)) {
+                    Write-Log "PASS Langfuse API found this-run parent+child"
+                    break
                 }
                 $got = $null
                 Start-Sleep -Seconds 2
             }
-            if ($null -eq $got -or -not $got.body) {
-                throw "Langfuse GET /api/public/traces never showed the run"
+            if ($null -eq $got -or -not (Test-LangfuseThisRun $got.body)) {
+                throw "Langfuse GET never showed this-run squad-oc.run + gen_ai.chat"
             }
 
             $lfRecord = [ordered]@{
@@ -411,9 +445,11 @@ try {
                 startedLangfuse = $startedLangfuse
                 endpoint        = $env:OTEL_EXPORTER_OTLP_ENDPOINT
                 protocol        = $env:OTEL_EXPORTER_OTLP_PROTOCOL
+                fromStartTime   = $fromStart
                 prompt          = $LangfusePrompt
                 runPreview      = $lfRunOut.Substring(0, [Math]::Min(240, $lfRunOut.Length))
                 tracesStatus    = $got.status
+                tracesUrl       = $got.url
                 traces          = $got.body
             }
             Write-JsonDump -Paths @($MainLangfuseDump, $WorktreeLangfuseDump) -Record $lfRecord | Out-Null
