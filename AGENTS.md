@@ -157,6 +157,8 @@ go test ./...
 go build -o squad-oc.exe ./cmd/squad-oc
 ```
 
+Prefer Task when it is on PATH (`task --list`): `task test`, `task ci` (fmt/vet/lint/race/build/vuln/actionlint), `task langfuse:up` / `task langfuse:down`, `task live:e2e` / `task live:traces`. Do not use this git clone as the live serve cwd.
+
 Live OpenCode HTTP checks need a running `opencode serve` and use the `live` build tag.
 
 ## Architecture

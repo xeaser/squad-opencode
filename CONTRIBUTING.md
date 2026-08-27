@@ -19,14 +19,28 @@ go test ./...
 go build -o squad-oc ./cmd/squad-oc
 ```
 
+Or, with [Task](https://taskfile.dev) (`go install github.com/go-task/task/v3/cmd/task@latest`):
+
+```bash
+task            # list
+task test       # go test ./...
+task ci         # local CI gate (fmt/vet/lint/race/build/vuln/actionlint)
+task tools      # install golangci-lint, govulncheck, actionlint
+task langfuse:up
+task langfuse:down
+task live:e2e
+task live:traces
+```
+
 Requires **Go 1.26.6+**. Optional live checks (dummy project only, never this clone as the serve cwd unless you mean to dogfood):
 
 ```powershell
 ./scripts/live-e2e.ps1
 ./scripts/live-traces.ps1
+# same as: task live:e2e / task live:traces
 ```
 
-`live-e2e.ps1` talks to `opencode serve` on `127.0.0.1:4096` (doctor + PONG). `live-traces.ps1` exercises JSONL spans and optional local Langfuse OTLP ingest. The TUI (`opencode`) is not the API. CI stays `go test ./...` without live env.
+`live-e2e.ps1` talks to `opencode serve` on `127.0.0.1:4096` (doctor + PONG). `live-traces.ps1` exercises JSONL spans and optional local Langfuse OTLP ingest. The TUI (`opencode`) is not the API. CI stays `go test ./...` without live env. `task ci` is the local mirror of `.github/workflows/ci.yml`.
 
 ## Branch and PR
 

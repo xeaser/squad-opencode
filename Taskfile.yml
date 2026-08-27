@@ -1,0 +1,125 @@
+# https://taskfile.dev — local CI + Langfuse/live helpers.
+# Install: go install github.com/go-task/task/v3/cmd/task@latest
+version: "3"
+
+vars:
+  BINARY: '{{if eq OS "windows"}}squad-oc.exe{{else}}squad-oc{{end}}'
+  COMPOSE: scripts/langfuse/docker-compose.yml
+  PWSH: '{{if eq OS "windows"}}powershell{{else}}pwsh{{end}}'
+
+tasks:
+  default:
+    desc: List tasks
+    silent: true
+    cmds:
+      - task --list
+
+  tools:
+    desc: Install golangci-lint, govulncheck, actionlint (versions match CI)
+    cmds:
+      - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
+      - go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
+      - go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+
+  test:
+    desc: Unit tests (no race, no live OpenCode)
+    cmds:
+      - go test ./...
+
+  test:race:
+    desc: Unit tests with -race (needs a C toolchain on Windows)
+    cmds:
+      - go test -race -count=1 ./...
+
+  vet:
+    desc: go vet
+    cmds:
+      - go vet ./...
+
+  lint:
+    desc: golangci-lint (same timeout as CI)
+    cmds:
+      - golangci-lint run --timeout=4m
+
+  fmt:
+    desc: Apply gofmt to all .go files
+    cmds:
+      - gofmt -w .
+
+  fmt:check:
+    desc: Fail if gofmt would change files (Linux/macOS; CI). Skipped on Windows (CRLF false positive).
+    cmds:
+      - task: fmt:check:windows
+      - task: fmt:check:unix
+
+  fmt:check:windows:
+    internal: true
+    platforms: [windows]
+    cmds:
+      - cmd /c echo skip gofmt -l on Windows CI still checks
+
+  fmt:check:unix:
+    internal: true
+    platforms: [linux, darwin]
+    cmds:
+      - |
+        files=$(gofmt -l .)
+        if [ -n "$files" ]; then
+          echo unformatted:
+          echo "$files"
+          exit 1
+        fi
+
+  build:
+    desc: Build squad-oc
+    cmds:
+      - go build -o {{.BINARY}} ./cmd/squad-oc
+
+  vuln:
+    desc: govulncheck
+    cmds:
+      - govulncheck ./...
+
+  actionlint:
+    desc: Lint GitHub workflow YAML
+    cmds:
+      - actionlint
+
+  ci:
+    desc: Local CI gate matching .github/workflows/ci.yml
+    deps: [fmt:check, vet, lint, test:race, build, vuln, actionlint]
+
+  langfuse:up:
+    desc: Start local Langfuse v4 on 127.0.0.1:3000
+    cmds:
+      - docker compose -f {{.COMPOSE}} up -d
+
+  langfuse:down:
+    desc: Stop local Langfuse (keeps volumes)
+    cmds:
+      - docker compose -f {{.COMPOSE}} down
+
+  langfuse:down:volumes:
+    desc: Stop local Langfuse and remove squad-oc-langfuse-* volumes
+    cmds:
+      - docker compose -f {{.COMPOSE}} down -v
+
+  live:e2e:
+    desc: Dummy PONG check (D:\xAI\squad-oc-dummy only)
+    cmds:
+      - "{{.PWSH}} -File scripts/live-e2e.ps1"
+
+  live:traces:
+    desc: Dummy traces + optional local Langfuse OTLP
+    cmds:
+      - "{{.PWSH}} -File scripts/live-traces.ps1"
+
+  live:traces:skip-langfuse:
+    desc: Dummy traces only (no Langfuse)
+    cmds:
+      - "{{.PWSH}} -File scripts/live-traces.ps1 -SkipLangfuse"
+
+  live:models:
+    desc: Dummy per-agent model pin check
+    cmds:
+      - "{{.PWSH}} -File scripts/live-models.ps1"
