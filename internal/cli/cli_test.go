@@ -2,7 +2,9 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -12,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/xeaser/squad-opencode/internal/brief"
 	"github.com/xeaser/squad-opencode/internal/squad"
 	"github.com/xeaser/squad-opencode/internal/traces"
 )
@@ -205,16 +208,38 @@ func TestTracesCLI(t *testing.T) {
 	}
 }
 
+type stubFailTickets struct{}
+
+func (stubFailTickets) ListOpen(context.Context) ([]brief.Ticket, error) {
+	return nil, fmt.Errorf("stubbed-brief-source")
+}
+
+type stubFailPRs struct{}
+
+func (stubFailPRs) ListOpen(context.Context) ([]brief.PR, error) {
+	return nil, fmt.Errorf("stubbed-brief-source")
+}
+
+func (stubFailPRs) ListMerged(context.Context, int) ([]brief.PR, error) {
+	return nil, fmt.Errorf("stubbed-brief-source")
+}
+
 func TestBriefCLI(t *testing.T) {
+	prevSources := newBriefSources
+	t.Cleanup(func() { newBriefSources = prevSources })
+	newBriefSources = func(string) (brief.TicketSource, brief.PRSource) {
+		return stubFailTickets{}, stubFailPRs{}
+	}
+
 	if Execute([]string{"brief", "--nope"}) != 2 {
 		t.Fatal("unknown flag")
 	}
 	empty := t.TempDir()
-	prev, _ := os.Getwd()
+	prevWD, _ := os.Getwd()
 	if err := os.Chdir(empty); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = os.Chdir(prev) })
+	t.Cleanup(func() { _ = os.Chdir(prevWD) })
 	if Execute([]string{"brief"}) != 1 {
 		t.Fatal("not initialized")
 	}
@@ -245,6 +270,9 @@ func TestBriefCLI(t *testing.T) {
 	}
 	if _, ok := payload["tickets"]; !ok {
 		t.Fatalf("%s", js)
+	}
+	if !strings.Contains(js, "stubbed-brief-source") {
+		t.Fatalf("want injected stub, not live gh: %s", js)
 	}
 	if _, err := os.Stat(filepath.Join(root, ".opencode", "commands", "squad-brief.md")); err != nil {
 		t.Fatal("squad-brief command missing after init")

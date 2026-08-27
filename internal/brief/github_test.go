@@ -73,3 +73,50 @@ func TestGitHubRunErrorIsError(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestGitHubOpenListsPassLimit(t *testing.T) {
+	var seen []string
+	g := GitHub{Dir: t.TempDir(), run: func(_ context.Context, args ...string) ([]byte, error) {
+		joined := strings.Join(args, " ")
+		seen = append(seen, joined)
+		if strings.Contains(joined, "pr list") || strings.Contains(joined, "issue list") {
+			return []byte(`[]`), nil
+		}
+		return nil, fmt.Errorf("unexpected gh %v", args)
+	}}
+	if _, err := (GitHubPRs{GitHub: g}).ListOpen(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := (GitHubTickets{GitHub: g}).ListOpen(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(seen) != 2 {
+		t.Fatalf("calls %v", seen)
+	}
+	for _, joined := range seen {
+		if !strings.Contains(joined, "--limit") {
+			t.Fatalf("missing --limit in %q", joined)
+		}
+		if !strings.Contains(joined, "1000") {
+			t.Fatalf("want --limit 1000 in %q", joined)
+		}
+	}
+}
+
+func TestGitHubPRViewErrorFailsListOpen(t *testing.T) {
+	g := GitHub{Dir: t.TempDir(), run: func(_ context.Context, args ...string) ([]byte, error) {
+		joined := strings.Join(args, " ")
+		switch {
+		case strings.Contains(joined, "pr list"):
+			return []byte(`[{"number":3,"title":"WIP","author":{"login":"ann"}}]`), nil
+		case strings.Contains(joined, "pr view"):
+			return nil, fmt.Errorf("gh pr view failed")
+		default:
+			return nil, fmt.Errorf("unexpected gh %v", args)
+		}
+	}}
+	_, err := GitHubPRs{GitHub: g}.ListOpen(context.Background())
+	if err == nil {
+		t.Fatal("expected ListOpen error when pr view fails")
+	}
+}

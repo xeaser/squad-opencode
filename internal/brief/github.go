@@ -42,7 +42,7 @@ func (g GitHub) exec(ctx context.Context, args ...string) ([]byte, error) {
 }
 
 func (g GitHubPRs) ListOpen(ctx context.Context) ([]PR, error) {
-	raw, err := g.exec(ctx, "pr", "list", "--state", "open", "--json", "number,title,author,isDraft,reviewDecision")
+	raw, err := g.exec(ctx, "pr", "list", "--state", "open", "--limit", "1000", "--json", "number,title,author,isDraft,reviewDecision")
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +51,11 @@ func (g GitHubPRs) ListOpen(ctx context.Context) ([]PR, error) {
 		return nil, err
 	}
 	for i := range prs {
-		prs[i].LinkedIssue = g.closingIssues(ctx, prs[i].Number)
+		links, err := g.closingIssues(ctx, prs[i].Number)
+		if err != nil {
+			return nil, err
+		}
+		prs[i].LinkedIssue = links
 	}
 	return prs, nil
 }
@@ -68,17 +72,20 @@ func (g GitHubPRs) ListMerged(ctx context.Context, limit int) ([]PR, error) {
 }
 
 func (g GitHubTickets) ListOpen(ctx context.Context) ([]Ticket, error) {
-	raw, err := g.exec(ctx, "issue", "list", "--state", "open", "--json", "number,title,createdAt")
+	raw, err := g.exec(ctx, "issue", "list", "--state", "open", "--limit", "1000", "--json", "number,title,createdAt")
 	if err != nil {
 		return nil, err
 	}
 	return parseTickets(raw)
 }
 
-func (g GitHubPRs) closingIssues(ctx context.Context, n int) []int {
+func (g GitHubPRs) closingIssues(ctx context.Context, n int) ([]int, error) {
 	raw, err := g.exec(ctx, "pr", "view", strconv.Itoa(n), "--json", "closingIssuesReferences,body")
-	if err != nil || len(raw) == 0 {
-		return nil
+	if err != nil {
+		return nil, err
+	}
+	if len(raw) == 0 {
+		return nil, nil
 	}
 	var wrap struct {
 		Body                    string `json:"body"`
@@ -87,7 +94,7 @@ func (g GitHubPRs) closingIssues(ctx context.Context, n int) []int {
 		} `json:"closingIssuesReferences"`
 	}
 	if err := json.Unmarshal(raw, &wrap); err != nil {
-		return parseBodyIssueRefs(string(raw))
+		return parseBodyIssueRefs(string(raw)), nil
 	}
 	var out []int
 	for _, ref := range wrap.ClosingIssuesReferences {
@@ -96,9 +103,9 @@ func (g GitHubPRs) closingIssues(ctx context.Context, n int) []int {
 		}
 	}
 	if len(out) == 0 {
-		return parseBodyIssueRefs(wrap.Body)
+		return parseBodyIssueRefs(wrap.Body), nil
 	}
-	return out
+	return out, nil
 }
 
 func parsePRs(raw []byte) ([]PR, error) {

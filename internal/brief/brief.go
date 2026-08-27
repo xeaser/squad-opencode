@@ -79,6 +79,7 @@ type Report struct {
 		DesignReviews []string `json:"designReviews"`
 	} `json:"inProgress"`
 	LastDone struct {
+		OK  bool `json:"ok"`
 		PRs []PR `json:"prs"`
 	} `json:"lastDone"`
 	Next       *Ticket      `json:"next"`
@@ -100,6 +101,13 @@ type RalphInfo struct {
 
 func Collect(ctx context.Context, opts Options) (Report, error) {
 	var rep Report
+	rep.Team.Members = []Member{}
+	rep.PRs.Items = []PR{}
+	rep.Tickets.Items = []Ticket{}
+	rep.InProgress.PRs = []PR{}
+	rep.InProgress.DesignReviews = []string{}
+	rep.LastDone.PRs = []PR{}
+	rep.NeedsYou = []ReviewNeed{}
 	if !squad.IsInitialized(opts.ProjectRoot) {
 		return rep, fmt.Errorf("not initialized")
 	}
@@ -121,24 +129,25 @@ func Collect(ctx context.Context, opts Options) (Report, error) {
 		rep.Team.Members = append(rep.Team.Members, Member{Name: m.Name, Role: m.Role, Status: m.Status})
 	}
 
-	rep.PRs = SourceList[PR]{Error: "unavailable"}
-	rep.Tickets = SourceList[Ticket]{Error: "unavailable"}
+	rep.PRs = SourceList[PR]{Error: "unavailable", Items: []PR{}}
+	rep.Tickets = SourceList[Ticket]{Error: "unavailable", Items: []Ticket{}}
 	if opts.PRs != nil {
 		open, err := opts.PRs.ListOpen(ctx)
 		if err != nil {
 			rep.PRs.Error = err.Error()
 		} else {
+			if open == nil {
+				open = []PR{}
+			}
 			rep.PRs = SourceList[PR]{OK: true, Items: open}
 			rep.InProgress.PRs = open
 		}
 		merged, err := opts.PRs.ListMerged(ctx, 5)
-		if err != nil {
-			if rep.PRs.OK {
-				// open succeeded; last-done stays empty
-			} else {
-				rep.PRs.Error = err.Error()
+		if err == nil {
+			if merged == nil {
+				merged = []PR{}
 			}
-		} else {
+			rep.LastDone.OK = true
 			rep.LastDone.PRs = merged
 		}
 	}
@@ -147,6 +156,9 @@ func Collect(ctx context.Context, opts Options) (Report, error) {
 		if err != nil {
 			rep.Tickets.Error = err.Error()
 		} else {
+			if items == nil {
+				items = []Ticket{}
+			}
 			rep.Tickets = SourceList[Ticket]{OK: true, Items: items}
 		}
 	}
@@ -226,7 +238,7 @@ func Format(r Report) string {
 		}
 	}
 	b.WriteString("\nLast done\n")
-	if !r.PRs.OK && len(r.LastDone.PRs) == 0 {
+	if !r.LastDone.OK {
 		b.WriteString("  unavailable\n")
 	} else if len(r.LastDone.PRs) == 0 {
 		b.WriteString("  (none)\n")
@@ -295,5 +307,26 @@ func writePRSection(b *strings.Builder, list SourceList[PR]) {
 }
 
 func FormatJSON(r Report) ([]byte, error) {
+	if r.Team.Members == nil {
+		r.Team.Members = []Member{}
+	}
+	if r.PRs.Items == nil {
+		r.PRs.Items = []PR{}
+	}
+	if r.Tickets.Items == nil {
+		r.Tickets.Items = []Ticket{}
+	}
+	if r.InProgress.PRs == nil {
+		r.InProgress.PRs = []PR{}
+	}
+	if r.InProgress.DesignReviews == nil {
+		r.InProgress.DesignReviews = []string{}
+	}
+	if r.LastDone.PRs == nil {
+		r.LastDone.PRs = []PR{}
+	}
+	if r.NeedsYou == nil {
+		r.NeedsYou = []ReviewNeed{}
+	}
 	return json.MarshalIndent(r, "", "  ")
 }

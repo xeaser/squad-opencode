@@ -266,6 +266,11 @@ func cmdStatus() int {
 	return 0
 }
 
+var newBriefSources = func(root string) (brief.TicketSource, brief.PRSource) {
+	gh := brief.GitHub{Dir: root}
+	return brief.GitHubTickets{GitHub: gh}, brief.GitHubPRs{GitHub: gh}
+}
+
 func cmdBrief(args []string) int {
 	asJSON := false
 	for _, a := range args {
@@ -288,11 +293,11 @@ func cmdBrief(args []string) int {
 		fmt.Fprintln(os.Stderr, "Not initialized. Run: squad-oc init --preset default")
 		return 1
 	}
-	gh := brief.GitHub{Dir: root}
+	tickets, prs := newBriefSources(root)
 	rep, err := brief.Collect(context.Background(), brief.Options{
 		ProjectRoot: root,
-		Tickets:     brief.GitHubTickets{GitHub: gh},
-		PRs:         brief.GitHubPRs{GitHub: gh},
+		Tickets:     tickets,
+		PRs:         prs,
 	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

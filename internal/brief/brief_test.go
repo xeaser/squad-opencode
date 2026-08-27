@@ -3,6 +3,7 @@ package brief
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -65,6 +66,57 @@ func TestCollectTeamAndJSONKeys(t *testing.T) {
 	for _, k := range []string{"team", "prs", "tickets", "inProgress", "lastDone", "next", "ralph", "needsYou", "ceremonies"} {
 		if _, ok := m[k]; !ok {
 			t.Fatalf("json missing %s: %s", k, raw)
+		}
+	}
+	assertJSONEmptyArrays(t, raw)
+
+	empty, err := Collect(context.Background(), Options{
+		ProjectRoot: root,
+		Tickets:     fakeTickets{},
+		PRs:         fakePRs{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !empty.PRs.OK || !empty.Tickets.OK {
+		t.Fatalf("empty sources should succeed: prs=%+v tickets=%+v", empty.PRs, empty.Tickets)
+	}
+	rawEmpty, err := FormatJSON(empty)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertJSONEmptyArrays(t, rawEmpty)
+}
+
+func assertJSONEmptyArrays(t *testing.T, raw []byte) {
+	t.Helper()
+	var m map[string]any
+	if err := json.Unmarshal(raw, &m); err != nil {
+		t.Fatal(err)
+	}
+	paths := [][]string{
+		{"team", "members"},
+		{"prs", "items"},
+		{"tickets", "items"},
+		{"inProgress", "prs"},
+		{"inProgress", "designReviews"},
+		{"lastDone", "prs"},
+		{"needsYou"},
+	}
+	for _, path := range paths {
+		cur := any(m)
+		for _, key := range path {
+			obj, ok := cur.(map[string]any)
+			if !ok {
+				t.Fatalf("%v not an object in %s", path, raw)
+			}
+			cur = obj[key]
+		}
+		if cur == nil {
+			t.Fatalf("%v is null, want [] in %s", path, raw)
+		}
+		if _, ok := cur.([]any); !ok {
+			t.Fatalf("%v is %T, want array in %s", path, cur, raw)
 		}
 	}
 }
@@ -143,12 +195,66 @@ type fakeTickets struct{ items []Ticket }
 func (f fakeTickets) ListOpen(context.Context) ([]Ticket, error) { return f.items, nil }
 
 type fakePRs struct {
-	open   []PR
-	merged []PR
+	open      []PR
+	merged    []PR
+	openErr   error
+	mergedErr error
 }
 
-func (f fakePRs) ListOpen(context.Context) ([]PR, error)       { return f.open, nil }
-func (f fakePRs) ListMerged(context.Context, int) ([]PR, error) { return f.merged, nil }
+func (f fakePRs) ListOpen(context.Context) ([]PR, error) {
+	if f.openErr != nil {
+		return nil, f.openErr
+	}
+	return f.open, nil
+}
+
+func (f fakePRs) ListMerged(context.Context, int) ([]PR, error) {
+	if f.mergedErr != nil {
+		return nil, f.mergedErr
+	}
+	return f.merged, nil
+}
+
+func TestCollectLastDoneUnavailableWhenMergedFails(t *testing.T) {
+	root := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	rep, err := Collect(context.Background(), Options{
+		ProjectRoot: root,
+		Tickets:     fakeTickets{},
+		PRs: fakePRs{
+			open:      []PR{{Number: 1, Title: "open"}},
+			mergedErr: fmt.Errorf("merged list failed"),
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !rep.PRs.OK {
+		t.Fatalf("open should succeed: %+v", rep.PRs)
+	}
+	text := Format(rep)
+	sec := section(text, "Last done")
+	if !strings.Contains(sec, "unavailable") {
+		t.Fatalf("want Last done unavailable, got %q\n%s", sec, text)
+	}
+	if strings.Contains(sec, "(none)") {
+		t.Fatalf("Last done must not be (none) when ListMerged fails:\n%s", text)
+	}
+}
+
+func section(text, heading string) string {
+	idx := strings.Index(text, heading)
+	if idx < 0 {
+		return ""
+	}
+	rest := text[idx:]
+	if next := strings.Index(rest[len(heading):], "\n\n"); next >= 0 {
+		return rest[:len(heading)+next]
+	}
+	return rest
+}
 
 func TestCollectGitHubNextSkipsLinked(t *testing.T) {
 	root := t.TempDir()
