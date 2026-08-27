@@ -163,6 +163,142 @@ func TestFormatTable(t *testing.T) {
 	}
 }
 
+func TestAppendListParentChildAndBodies(t *testing.T) {
+	root := t.TempDir()
+	start := time.Date(2026, 8, 27, 12, 0, 0, 0, time.UTC)
+	parent := Span{
+		Name:       "squad-oc.run",
+		TraceID:    "aabbccddeeff00112233445566778899",
+		SpanID:     "1122334455667788",
+		Start:      start,
+		End:        start.Add(time.Second),
+		Status:     "OK",
+		Agent:      "lead",
+		Attributes: map[string]string{"agent": "lead", "prompt_bytes": "5"},
+	}
+	child := Span{
+		Name:         NameChat,
+		TraceID:      parent.TraceID,
+		SpanID:       "99aabbccddeeff00",
+		ParentID:     parent.SpanID,
+		Start:        start,
+		End:          start.Add(time.Second),
+		Status:       "OK",
+		SessionID:    "ses_1",
+		Agent:        "lead",
+		Provider:     "xai",
+		Model:        "grok-4",
+		InputTokens:  12,
+		OutputTokens: 34,
+		Cost:         0.0025,
+		Prompt:       "hello",
+		Completion:   "world",
+	}
+	if err := Append(root, parent); err != nil {
+		t.Fatal(err)
+	}
+	if err := Append(root, child); err != nil {
+		t.Fatal(err)
+	}
+	got, err := List(root, 0)
+	if err != nil || len(got) != 2 {
+		t.Fatalf("%+v %v", got, err)
+	}
+	if got[0].Name != "squad-oc.run" || got[1].Name != NameChat {
+		t.Fatalf("%+v", got)
+	}
+	if got[1].ParentID != parent.SpanID || got[1].Prompt != "hello" || got[1].Completion != "world" {
+		t.Fatalf("child %+v", got[1])
+	}
+	if got[1].Model != "grok-4" || got[1].InputTokens != 12 || got[1].Cost != 0.0025 {
+		t.Fatalf("usage %+v", got[1])
+	}
+}
+
+func TestFormatTableModelTokensCostAndFooter(t *testing.T) {
+	start := time.Date(2026, 8, 27, 12, 0, 0, 0, time.UTC)
+	parent := sampleSpan("squad-oc.run", start, map[string]string{"agent": "squad"})
+	parent.Agent = "squad"
+	child := sampleSpan(NameChat, start.Add(time.Second), nil)
+	child.ParentID = parent.SpanID
+	child.Model = "grok-4"
+	child.InputTokens = 10
+	child.OutputTokens = 20
+	child.Cost = 0.01
+	child.Prompt = "hello"
+	child.Completion = "world"
+	out := FormatTable([]Span{parent, child})
+	for _, want := range []string{"NAME", "MODEL", "TOKENS", "COST", "squad-oc.run", NameChat, "grok-4", "10/20"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "hello") || strings.Contains(out, "world") {
+		t.Fatal("must not print bodies")
+	}
+	if !strings.Contains(out, "Cost:") || !strings.Contains(out, "in=10") || !strings.Contains(out, "out=20") || !strings.Contains(out, "spans=1") {
+		t.Fatalf("footer: %s", out)
+	}
+	// parents must not double-count
+	parent.Cost = 9
+	parent.InputTokens = 99
+	out = FormatTable([]Span{parent, child})
+	if !strings.Contains(out, "spans=1") || strings.Contains(out, "in=109") {
+		t.Fatalf("parent leaked into footer: %s", out)
+	}
+}
+
+func TestExportOTLPHasGenAINoBodies(t *testing.T) {
+	start := time.Date(2026, 8, 27, 12, 0, 0, 0, time.UTC)
+	child := sampleSpan(NameChat, start, map[string]string{"agent": "squad"})
+	child.ParentID = "1122334455667788"
+	child.SessionID = "ses_1"
+	child.Agent = "squad"
+	child.Provider = "xai"
+	child.Model = "grok-4"
+	child.InputTokens = 3
+	child.OutputTokens = 4
+	child.ReasoningTokens = 1
+	child.CacheReadTokens = 2
+	child.CacheWriteTokens = 5
+	child.Cost = 0
+	child.Prompt = "SECRET_PROMPT"
+	child.Completion = "SECRET_COMPLETION"
+	dest := filepath.Join(t.TempDir(), "otlp.json")
+	if err := ExportOTLPFile([]Span{child}, dest); err != nil {
+		t.Fatal(err)
+	}
+	body, err := os.ReadFile(dest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(body)
+	for _, want := range []string{
+		`"parentSpanId"`,
+		"gen_ai.operation.name",
+		"gen_ai.provider.name",
+		"gen_ai.request.model",
+		"gen_ai.usage.input_tokens",
+		"gen_ai.usage.output_tokens",
+		"gen_ai.usage.reasoning.output_tokens",
+		"gen_ai.usage.cache_read.input_tokens",
+		"gen_ai.usage.cache_write.input_tokens",
+		"gen_ai.usage.cost",
+		"gen_ai.agent.name",
+		"gen_ai.conversation.id",
+	} {
+		if !strings.Contains(s, want) {
+			t.Fatalf("missing %q in %s", want, s)
+		}
+	}
+	if strings.Contains(s, "SECRET_PROMPT") || strings.Contains(s, "SECRET_COMPLETION") {
+		t.Fatal("export leaked bodies")
+	}
+	if strings.Contains(s, "gen_ai.input.messages") || strings.Contains(s, "gen_ai.output.messages") {
+		t.Fatal("export must not include messages")
+	}
+}
+
 func TestInitGitignoreIgnoresTraces(t *testing.T) {
 	root := t.TempDir()
 	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {

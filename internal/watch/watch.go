@@ -16,6 +16,9 @@ import (
 	"github.com/xeaser/squad-opencode/internal/traces"
 )
 
+// pushOTLP is the OTel export hook. TestMain no-ops it; collector-down tests replace it.
+var pushOTLP = traces.Push
+
 // Issue is a work item (usually a GitHub issue).
 type Issue struct {
 	Number int    `json:"number"`
@@ -294,25 +297,37 @@ func Pass(ctx context.Context, opts Options) (executed bool, summary string, err
 	notify(opts, NotifyImportant, "execute started")
 	start := time.Now()
 	res, err := opts.Runner.Run(ctx, opencodeclient.RunRequest{
-		Directory: opts.ProjectRoot,
-		Agent:     "squad",
-		Prompt:    ctxText,
-		Title:     "squad-oc watch",
+		Directory:  opts.ProjectRoot,
+		Agent:      "squad",
+		Prompt:     ctxText,
+		Title:      "squad-oc watch",
+		SkipRecord: true,
 	})
-	status := "OK"
-	if err != nil {
-		status = "ERROR"
+	s, rerr := traces.ResolveSettings(squad.Detect(opts.ProjectRoot).Config, os.Getenv)
+	if rerr != nil {
+		s = traces.Settings{}
 	}
-	if opts.ProjectRoot != "" {
-		_ = traces.Append(opts.ProjectRoot, traces.Span{
-			Name:   "squad-oc.watch.execute",
-			Start:  start,
-			End:    time.Now(),
-			Status: status,
-			Attributes: map[string]string{
-				"issues": strconv.Itoa(len(issues)),
-			},
-		})
+	if werr := traces.Write(opts.ProjectRoot, traces.RecordInput{
+		ParentName:       "squad-oc.watch.execute",
+		Start:            start,
+		End:              time.Now(),
+		Err:              err,
+		Agent:            "squad",
+		Prompt:           ctxText,
+		Completion:       res.Text,
+		SessionID:        res.SessionID,
+		Attrs:            map[string]string{"issues": strconv.Itoa(len(issues))},
+		HasGeneration:    res.HasGeneration,
+		Provider:         res.Provider,
+		Model:            res.Model,
+		InputTokens:      res.InputTokens,
+		OutputTokens:     res.OutputTokens,
+		ReasoningTokens:  res.ReasoningTokens,
+		CacheReadTokens:  res.CacheReadTokens,
+		CacheWriteTokens: res.CacheWriteTokens,
+		Cost:             res.Cost,
+	}, s, pushOTLP); werr != nil {
+		fmt.Fprintln(os.Stderr, "traces:", werr)
 	}
 	if err != nil {
 		notify(opts, NotifyImportant, "execute error: "+err.Error())

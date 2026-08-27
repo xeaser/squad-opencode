@@ -15,6 +15,15 @@ import (
 	"github.com/xeaser/squad-opencode/internal/traces"
 )
 
+func TestMain(m *testing.M) {
+	pushOTLP = func(context.Context, traces.Settings, traces.Span, *traces.Span) error {
+		return nil
+	}
+	_ = os.Unsetenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	_ = os.Unsetenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")
+	os.Exit(m.Run())
+}
+
 func TestBuildContextAndPass(t *testing.T) {
 	root := t.TempDir()
 	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
@@ -36,7 +45,7 @@ func TestBuildContextAndPass(t *testing.T) {
 		t.Fatal(labeled)
 	}
 
-	fake := &opencodeclient.FakeRunner{}
+	fake := &opencodeclient.FakeRunner{Text: "done"}
 	ok, summary, err := Pass(context.Background(), Options{
 		ProjectRoot: root,
 		Execute:     true,
@@ -48,6 +57,9 @@ func TestBuildContextAndPass(t *testing.T) {
 	}
 	if len(fake.Calls) != 1 {
 		t.Fatal(fake.Calls)
+	}
+	if !fake.Calls[0].SkipRecord {
+		t.Fatal("watch must set SkipRecord so SDKRunner does not also write squad-oc.run")
 	}
 	if !strings.Contains(summary, "issues=1") {
 		t.Fatal(summary)
@@ -66,14 +78,20 @@ func TestBuildContextAndPass(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(spans) != 1 {
-		t.Fatalf("execute should record one span, got %+v", spans)
+	if len(spans) != 2 {
+		t.Fatalf("execute should record parent+child, got %+v", spans)
 	}
 	if spans[0].Name != "squad-oc.watch.execute" || spans[0].Status != "OK" {
 		t.Fatalf("%+v", spans[0])
 	}
 	if spans[0].Attributes["issues"] != "1" {
 		t.Fatalf("issues attr: %+v", spans[0].Attributes)
+	}
+	if spans[1].Name != traces.NameChat || spans[1].Completion != "done" {
+		t.Fatalf("child %+v", spans[1])
+	}
+	if spans[1].SessionID != "fake-session" || spans[1].Prompt == "" {
+		t.Fatalf("child session/prompt %+v", spans[1])
 	}
 }
 
@@ -122,6 +140,35 @@ func TestPassExecuteRecordsErrorSpan(t *testing.T) {
 	}
 	if spans[0].Attributes["issues"] != "2" {
 		t.Fatalf("issues attr: %+v", spans[0].Attributes)
+	}
+}
+
+func TestPassCollectorFailureDoesNotFail(t *testing.T) {
+	root := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:1")
+	prev := pushOTLP
+	t.Cleanup(func() { pushOTLP = prev })
+	pushOTLP = func(context.Context, traces.Settings, traces.Span, *traces.Span) error {
+		return errors.New("collector down")
+	}
+	ok, _, err := Pass(context.Background(), Options{
+		ProjectRoot: root,
+		Execute:     true,
+		Lister:      StaticLister{Issues: []Issue{{Number: 1, Title: "x", State: "OPEN"}}},
+		Runner:      &opencodeclient.FakeRunner{Text: "ok"},
+	})
+	if err != nil || !ok {
+		t.Fatalf("push must not fail Pass: ok=%v err=%v", ok, err)
+	}
+	spans, err := traces.List(root, 10)
+	if err != nil || len(spans) != 2 {
+		t.Fatalf("JSONL must still be written: %+v %v", spans, err)
+	}
+	if spans[0].Name != "squad-oc.watch.execute" || spans[1].Name != traces.NameChat {
+		t.Fatalf("%+v", spans)
 	}
 }
 

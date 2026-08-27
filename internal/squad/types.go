@@ -1,5 +1,12 @@
 package squad
 
+// OTLP is optional live-export knobs. Missing key = unset. Never store API keys here.
+type OTLPConfig struct {
+	Endpoint       string `json:"endpoint,omitempty"`
+	Protocol       string `json:"protocol,omitempty"`
+	CaptureContent *bool  `json:"capture_content,omitempty"`
+}
+
 // Config is stored at .squad/config.json and marks initialization.
 type Config struct {
 	Version            int    `json:"version"`
@@ -20,6 +27,8 @@ type Config struct {
 	Theme string `json:"theme,omitempty"`
 	// ThemeOrigin is how the theme was set: "init" or "applied".
 	ThemeOrigin string `json:"themeOrigin,omitempty"`
+	// OTLP is optional live OTLP export settings (env wins at resolve time).
+	OTLP *OTLPConfig `json:"otlp,omitempty"`
 }
 
 // MentionRow is one row in .squad/mentions.md (slugs without @).

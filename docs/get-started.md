@@ -53,7 +53,7 @@ Inside OpenCode:
 3. Paste your API key
 4. Quit when done
 
-Optional: pin a seat to an OpenCode id (`provider/model-id`) with `squad-oc cast --model squad xai/grok-3` or `cast --add NAME --model anthropic/claude-sonnet-4-5`. Empty cells inherit the Squad model, then the session default. This does not write `opencode.json`.
+Optional: pin a seat to an OpenCode id (`provider/model-id`) with `squad-oc cast --model squad opencode/big-pickle` or `cast --add NAME --model opencode/hy3-free`. Use an id from `opencode models` on this machine — `xai/…` and `anthropic/…` only work after `/connect` for that provider. Empty cells inherit the Squad model, then the session default. This does not write `opencode.json`.
 
 ---
 
@@ -186,7 +186,7 @@ The script builds `squad-oc.exe`, inits `D:\xAI\squad-oc-dummy` if needed, start
 - `squad-oc watch --health` prints the last Ralph snapshot
 - `squad-oc brief` prints the morning listing (PRs, tickets, last done, next). Soft if `gh` is missing.
 - `squad-oc watch --execute --overnight-start 18:00 --overnight-end 08:00`
-- `squad-oc traces` lists local run/watch spans (`--export` writes OTLP JSON)
+- `squad-oc traces` lists local run/watch spans (default: `.squad/traces/spans.jsonl`; `--export` writes OTLP JSON). File is the default; set `OTEL_EXPORTER_OTLP_ENDPOINT` (or traces-specific) to push during `run` / `watch --execute`. Protocols: `http/protobuf` (default) and `grpc` via `OTEL_EXPORTER_OTLP_PROTOCOL`. Bodies always in local JSONL; OTel message content only if `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT` is on (default off). Langfuse local: endpoint `http://127.0.0.1:3000/api/public/otel`, Basic Auth in `OTEL_EXPORTER_OTLP_HEADERS`, header `x-langfuse-ingestion-version=4`. Aspire standalone can consume OTLP; it is not a shipped command.
 - `squad-oc run -p "…"` starts `opencode serve` on `127.0.0.1:4096` if nothing is there; a custom `--url` never auto-starts
 - `squad-oc pack <path|git-url>` or `squad-oc upstream add <name> <path|git-url>` to pull extra agents/skills (see README)
 - `squad-oc mcp init` / `apply` / `list` — org `.squad/mcp-config.json` into `opencode.json` (workshop §8)

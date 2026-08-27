@@ -132,7 +132,7 @@ Commands:
   link --sync
   link --off
   update-check [--json] [--refresh]
-  traces [--last N] [--json] [--export file]
+  traces [--last N] [--json] [--export file]   # local spans.jsonl; OTEL_EXPORTER_OTLP_* optional push
   mcp apply | list | init
   marketplace add <name> <path|git-url> | list | remove <name> | browse [name] | install <plugin> [--from <name>]
   plugin install <name>@<marketplace> | list | uninstall <name>
@@ -593,6 +593,10 @@ func cmdRun(args []string) int {
 	if code != 0 {
 		return code
 	}
+	if _, err := traces.ResolveSettings(squad.Detect(root).Config, os.Getenv); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 2
+	}
 	ensured, code := ensureAPI(apiURL, root)
 	if code != 0 {
 		return code
@@ -670,6 +674,10 @@ func cmdWatch(args []string) int {
 	root, code := cwd()
 	if code != 0 {
 		return code
+	}
+	if _, err := traces.ResolveSettings(squad.Detect(root).Config, os.Getenv); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 2
 	}
 	backend, err := watch.ParseStateBackend(stateBackend, root)
 	if err != nil {

@@ -15,8 +15,8 @@ $MainDump = Join-Path $MainDumpDir "dummy-per-agent-model-config.json"
 $WorktreeDumpDir = Join-Path $RepoRoot ".playwright-mcp"
 $WorktreeDump = Join-Path $WorktreeDumpDir "dummy-per-agent-model-config.json"
 
-$SquadModel = "xai/grok-3"
-$LeadModel = "anthropic/claude-sonnet-4-5"
+$SquadModel = "opencode/big-pickle"
+$LeadModel = "opencode/hy3-free"
 
 $startedServe = $false
 $serveProc = $null
