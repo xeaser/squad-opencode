@@ -316,6 +316,7 @@ func Pass(ctx context.Context, opts Options) (executed bool, summary string, err
 		Prompt:           ctxText,
 		Completion:       res.Text,
 		SessionID:        res.SessionID,
+		MessageID:        res.MessageID,
 		Attrs:            map[string]string{"issues": strconv.Itoa(len(issues))},
 		HasGeneration:    res.HasGeneration,
 		Provider:         res.Provider,

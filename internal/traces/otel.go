@@ -153,6 +153,7 @@ func parentOTelAttrs(s Span) []attribute.KeyValue {
 	}
 	if s.SessionID != "" {
 		attrs = append(attrs, attribute.String("gen_ai.conversation.id", s.SessionID))
+		attrs = append(attrs, attribute.String("session.id", s.SessionID))
 	}
 	if v := s.Attributes["issues"]; v != "" {
 		attrs = append(attrs, attribute.String("issues", v))
@@ -187,6 +188,7 @@ func childOTelAttrs(s Span, capture bool) []attribute.KeyValue {
 	}
 	if s.SessionID != "" {
 		attrs = append(attrs, attribute.String("gen_ai.conversation.id", s.SessionID))
+		attrs = append(attrs, attribute.String("session.id", s.SessionID))
 	}
 	if capture {
 		attrs = append(attrs,

@@ -94,7 +94,7 @@ OpenCode creates `.opencode/package.json` (`@opencode-ai/plugin`) and runs an in
 | `pack <path\|git-url>` | One-shot pull of extra agents/skills |
 | `link <team-dir|git-url>` / `link --sync` / `link --off` | Share one team directory across several repos (git URL clones into `~/.squad-oc/links/`) |
 | `update-check [--json] [--refresh]` | Prints `up to date` or `update available` vs GitHub latest tag |
-| `traces [--last N] [--json] [--export file]` | Local `run` / `watch` spans (`.squad/traces/spans.jsonl`); `--export` writes OTLP JSON; optional live push via `OTEL_EXPORTER_OTLP_*` |
+| `traces [--last N] [--json] [--export file] [--follow]` | Local spans plus OpenCode SQLite ingest (TUI/Web/serve); `--export` writes OTLP JSON; optional live push via `OTEL_EXPORTER_OTLP_*` |
 | `mcp apply` / `list` / `init` | Merge org `.squad/mcp-config.json` into `opencode.json` |
 | `marketplace add` / `list` / `remove` / `browse` / `install` | Register a skills pack and copy a plugin into `.opencode/skills/` |
 | `plugin install <name>@<marketplace>` / `list` / `uninstall <name>` | Named skill install; uninstall removes only `.opencode/skills/<name>/` |
@@ -111,6 +111,7 @@ internal/watch/          # issue triage (Ralph): health, overnight, backends
 internal/githubissues/   # gh issue list
 internal/share/          # upstream / pack / link
 internal/traces/         # local JSONL spans + OTLP export
+internal/opencodestore/  # read-only OpenCode SQLite (TUI ingest)
 internal/selfupdate/     # upgrade --self
 internal/updatecheck/
 internal/version/
@@ -133,7 +134,7 @@ squad-oc (Go)
 
 `upgrade --self` downloads the latest GitHub Release for this OS/arch and replaces the running binary. On Windows, if the exe is locked, it writes `squad-oc.exe.new` beside it (`replaced on next start`).
 
-`traces` lists local spans from `run` and `watch --execute`. Default storage is `.squad/traces/spans.jsonl`. `--export file` writes OTLP JSON any collector can ingest. Set `OTEL_EXPORTER_OTLP_ENDPOINT` (or `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`) to push live during `run` / `watch --execute`. Protocols: `http/protobuf` (default) and `grpc` via `OTEL_EXPORTER_OTLP_PROTOCOL`. Prompt/completion bodies always land in local JSONL; OTel message attributes only when `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT` is on (default off). Langfuse local example: endpoint `http://127.0.0.1:3000/api/public/otel`, Basic Auth in `OTEL_EXPORTER_OTLP_HEADERS`, plus header `x-langfuse-ingestion-version=4`. Aspire Dashboard remains a valid OTLP **consumer**, not a shipped `squad-oc` command.
+`traces` lists local spans from `run` and `watch --execute`, and ingests completed TUI/Web/serve turns from OpenCode SQLite (default `$XDG_DATA_HOME/opencode/opencode.db` or `~/.local/share/opencode/opencode.db` on every OS, including Windows `%USERPROFILE%\.local\share\opencode\opencode.db`). Override with `OPENCODE_DB` or `opencode_db` in `.squad/config.json`. Dedup is by assistant `messageId` so a later TUI turn on a CLI session still ingests. `--follow` polls every 2s. `--export file` writes OTLP JSON any collector can ingest. Set `OTEL_EXPORTER_OTLP_ENDPOINT` (or `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`) to push live during `run` / `watch --execute` and on ingest. Protocols: `http/protobuf` (default) and `grpc` via `OTEL_EXPORTER_OTLP_PROTOCOL`. Prompt/completion bodies always land in local JSONL; OTel message attributes only when `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT` is on (default off). Langfuse groups turns by OpenCode `ses_*` (`session.id`). For in-process streaming, the official Langfuse OpenCode plugin is optional and separate; we do not install it. Aspire Dashboard remains a valid OTLP **consumer**, not a shipped `squad-oc` command.
 
 ### Share extra agents (`upstream` / `pack`)
 

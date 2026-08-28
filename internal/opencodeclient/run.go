@@ -25,7 +25,7 @@ type RunRequest struct {
 
 // RunResult is the assistant text from a session.
 type RunResult struct {
-	SessionID                                                                     string
+	SessionID, MessageID                                                          string
 	Text                                                                          string
 	HasGeneration                                                                 bool
 	Provider, Model                                                               string
@@ -107,6 +107,7 @@ func (r SDKRunner) run(ctx context.Context, req RunRequest) (RunResult, error) {
 	}
 	res := RunResult{SessionID: sess.ID, Text: b.String(), HasGeneration: true}
 	if resp != nil {
+		res.MessageID = resp.Info.ID
 		res.Provider = resp.Info.ProviderID
 		res.Model = resp.Info.ModelID
 		res.Cost = resp.Info.Cost
@@ -136,6 +137,7 @@ func recordRun(req RunRequest, start time.Time, runErr error, res RunResult) {
 		Prompt:           req.Prompt,
 		Completion:       res.Text,
 		SessionID:        res.SessionID,
+		MessageID:        res.MessageID,
 		Attrs:            map[string]string{"prompt_bytes": strconv.Itoa(len(req.Prompt))},
 		HasGeneration:    res.HasGeneration,
 		Provider:         res.Provider,

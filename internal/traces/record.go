@@ -15,6 +15,7 @@ type RecordInput struct {
 	Prompt     string
 	Completion string
 	SessionID  string
+	MessageID  string
 	Attrs      map[string]string
 	// Generation set when Session.Prompt returned (even if Info empty).
 	HasGeneration                                                                 bool
@@ -49,6 +50,7 @@ func Build(in RecordInput) (parent Span, child *Span) {
 		Status:     status,
 		Attributes: attrs,
 		SessionID:  in.SessionID,
+		MessageID:  in.MessageID,
 		Agent:      agent,
 	}
 	if parent.TraceID == "" {
@@ -74,6 +76,7 @@ func Build(in RecordInput) (parent Span, child *Span) {
 		End:              in.End,
 		Status:           "OK",
 		SessionID:        in.SessionID,
+		MessageID:        in.MessageID,
 		Agent:            agent,
 		Provider:         in.Provider,
 		Model:            in.Model,
@@ -94,6 +97,11 @@ func Build(in RecordInput) (parent Span, child *Span) {
 // as "append: …" or "otlp push: …" so callers can log one stderr line.
 func Write(projectRoot string, in RecordInput, s Settings, push func(context.Context, Settings, Span, *Span) error) error {
 	parent, child := Build(in)
+	return writeBuilt(projectRoot, parent, child, s, push)
+}
+
+// writeBuilt appends and optionally pushes already-built spans.
+func writeBuilt(projectRoot string, parent Span, child *Span, s Settings, push func(context.Context, Settings, Span, *Span) error) error {
 	if projectRoot != "" {
 		if err := Append(projectRoot, parent); err != nil {
 			return fmt.Errorf("append: %w", err)
