@@ -294,13 +294,30 @@ func tokensFromMap(obj map[string]any) msgRow {
 	return m
 }
 
+// sameDir treats distinct spellings of the same directory as equal
+// (macOS /var vs /private/var; Windows junctions).
 func sameDir(a, b string) bool {
-	a = filepath.ToSlash(filepath.Clean(a))
-	b = filepath.ToSlash(filepath.Clean(b))
-	if runtime.GOOS == "windows" {
-		return strings.EqualFold(a, b)
+	if a == "" || b == "" {
+		return a == b
 	}
-	return a == b
+	if fa, err := os.Stat(a); err == nil {
+		if fb, err := os.Stat(b); err == nil && os.SameFile(fa, fb) {
+			return true
+		}
+	}
+	return normDir(a) == normDir(b)
+}
+
+func normDir(p string) string {
+	p = filepath.Clean(p)
+	if r, err := filepath.EvalSymlinks(p); err == nil {
+		p = r
+	}
+	p = filepath.ToSlash(p)
+	if runtime.GOOS == "windows" {
+		return strings.ToLower(p)
+	}
+	return p
 }
 
 func msTime(ms int64) time.Time {

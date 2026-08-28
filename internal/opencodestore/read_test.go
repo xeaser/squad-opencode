@@ -3,7 +3,9 @@ package opencodestore
 import (
 	"database/sql"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -46,6 +48,46 @@ func TestListTurnsFilterAndMap(t *testing.T) {
 	}
 	if tr.Prompt != "hello" || tr.Completion != "ok" {
 		t.Fatalf("bodies %+v", tr)
+	}
+}
+
+// macOS /var is a symlink to /private/var. OpenCode may store one spelling
+// while Getwd() returns the other; ingest must still match the project.
+func TestSameDirViaSymlink(t *testing.T) {
+	root := t.TempDir()
+	real := filepath.Join(root, "proj")
+	if err := os.Mkdir(real, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(root, "alias")
+	if err := os.Symlink(real, link); err != nil {
+		if runtime.GOOS == "windows" {
+			out, jerr := exec.Command("cmd", "/c", "mklink", "/J", link, real).CombinedOutput()
+			if jerr != nil {
+				t.Skipf("symlink: %v; junction: %v %s", err, jerr, out)
+			}
+		} else {
+			resolved, err2 := filepath.EvalSymlinks(root)
+			if err2 != nil || filepath.Clean(resolved) == filepath.Clean(root) {
+				t.Skipf("symlink: %v", err)
+			}
+			real, link = root, resolved
+		}
+	}
+	if !sameDir(real, link) {
+		t.Fatalf("sameDir(%q, %q) = false", real, link)
+	}
+	if sameDir(real, filepath.Join(root, "other")) {
+		t.Fatal("different dirs matched")
+	}
+}
+
+func TestSameDirEmpty(t *testing.T) {
+	if sameDir("", "/tmp/proj") || sameDir("/tmp/proj", "") {
+		t.Fatal("empty matched")
+	}
+	if !sameDir("", "") {
+		t.Fatal("empty != empty")
 	}
 }
 
