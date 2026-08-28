@@ -19,6 +19,9 @@ import (
 // NameChat is the OTel gen_ai operation span name for chat generations.
 const NameChat = "gen_ai.chat"
 
+// NameSession is the parent span for an ingested OpenCode turn.
+const NameSession = "squad-oc.session"
+
 // Span is a local recorded interval.
 type Span struct {
 	Name       string            `json:"name"`
@@ -31,6 +34,7 @@ type Span struct {
 	Attributes map[string]string `json:"attributes"`
 
 	SessionID        string  `json:"sessionId,omitempty"`
+	MessageID        string  `json:"messageId,omitempty"`
 	Agent            string  `json:"agent,omitempty"`
 	Provider         string  `json:"provider,omitempty"`
 	Model            string  `json:"model,omitempty"`
@@ -254,6 +258,7 @@ func appendGenAIExportAttrs(attrs []otlpKeyValue, s Span) []otlpKeyValue {
 	}
 	if s.SessionID != "" {
 		attrs = append(attrs, stringAttr("gen_ai.conversation.id", s.SessionID))
+		attrs = append(attrs, stringAttr("session.id", s.SessionID))
 	}
 	if s.InputTokens != 0 {
 		attrs = append(attrs, stringAttr("gen_ai.usage.input_tokens", fmt.Sprintf("%d", s.InputTokens)))

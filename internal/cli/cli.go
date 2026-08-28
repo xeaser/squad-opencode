@@ -7,9 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/xeaser/squad-opencode/internal/brief"
@@ -132,7 +134,7 @@ Commands:
   link --sync
   link --off
   update-check [--json] [--refresh]
-  traces [--last N] [--json] [--export file]   # local spans.jsonl; OTEL_EXPORTER_OTLP_* optional push
+  traces [--last N] [--json] [--export file] [--follow]   # JSONL + OpenCode SQLite ingest; OTEL optional
   mcp apply | list | init
   marketplace add <name> <path|git-url> | list | remove <name> | browse [name] | install <plugin> [--from <name>]
   plugin install <name>@<marketplace> | list | uninstall <name>
@@ -1059,11 +1061,14 @@ func cmdTraces(args []string) int {
 	last := 20
 	asJSON := false
 	exportPath := ""
+	follow := false
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch {
 		case a == "--json":
 			asJSON = true
+		case a == "--follow":
+			follow = true
 		case a == "--last" && i+1 < len(args):
 			i++
 			n, err := strconv.Atoi(args[i])
@@ -1091,6 +1096,12 @@ func cmdTraces(args []string) int {
 	}
 	root, code := cwd()
 	if code != 0 {
+		return code
+	}
+	if follow {
+		return tracesFollowFn(root)
+	}
+	if code := tracesIngestOnce(root); code != 0 {
 		return code
 	}
 	spans, err := traces.List(root, last)
@@ -1121,6 +1132,49 @@ func cmdTraces(args []string) int {
 	}
 	fmt.Print(traces.FormatTable(spans))
 	return 0
+}
+
+var tracesFollowFn = tracesFollow
+
+// tracesIngestPush is the OTLP export hook for CLI ingest; tests replace it.
+var tracesIngestPush = traces.Push
+
+func tracesIngestOnce(root string) int {
+	_, err := traces.Ingest(root, squad.Detect(root).Config, os.Getenv, tracesIngestPush)
+	if err != nil {
+		if traces.IsOTLPPushError(err) {
+			fmt.Fprintln(os.Stderr, "traces:", err)
+			return 0
+		}
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	return 0
+}
+
+func tracesFollow(root string) int {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	for {
+		n, err := traces.Ingest(root, squad.Detect(root).Config, os.Getenv, tracesIngestPush)
+		if err != nil {
+			if traces.IsOTLPPushError(err) {
+				fmt.Fprintln(os.Stderr, "traces:", err)
+				// JSONL kept; keep polling
+			} else {
+				fmt.Fprintln(os.Stderr, err)
+				return 1
+			}
+		}
+		if n > 0 {
+			fmt.Printf("ingested %d\n", n)
+		}
+		select {
+		case <-ctx.Done():
+			return 0
+		case <-time.After(2 * time.Second):
+		}
+	}
 }
 
 func cmdMCP(args []string) int {

@@ -27,6 +27,7 @@ func TestBuildParentChildAndParentOnly(t *testing.T) {
 		Prompt:        "hi",
 		Completion:    "yo",
 		SessionID:     "ses_1",
+		MessageID:     "msg_1",
 		Attrs:         map[string]string{"agent": "lead", "prompt_bytes": "2"},
 		HasGeneration: true,
 		Provider:      "xai",
@@ -41,8 +42,11 @@ func TestBuildParentChildAndParentOnly(t *testing.T) {
 	if child.TraceID != parent.TraceID || child.ParentID != parent.SpanID {
 		t.Fatal("tree")
 	}
-	if child.Prompt != "hi" || child.Cost != 0 || child.Model != "grok-4" {
+	if child.Prompt != "hi" || child.Cost != 0 || child.Model != "grok-4" || child.MessageID != "msg_1" {
 		t.Fatalf("child %+v", child)
+	}
+	if parent.MessageID != "msg_1" {
+		t.Fatalf("parent message %q", parent.MessageID)
 	}
 
 	parent, child = Build(RecordInput{ParentName: "squad-oc.run", Err: errors.New("boom"), Agent: "squad"})
@@ -139,6 +143,9 @@ func TestRecordToSpanRecorderTypedAttrs(t *testing.T) {
 	attrs := attrMap(gen.Attributes())
 	if attrs["gen_ai.request.model"] != "grok-4" {
 		t.Fatalf("%v", attrs)
+	}
+	if attrs["session.id"] != "ses_1" || attrs["gen_ai.conversation.id"] != "ses_1" {
+		t.Fatalf("session attrs %v", attrs)
 	}
 	if _, ok := attrs["gen_ai.input.messages"]; ok {
 		t.Fatal("capture off")

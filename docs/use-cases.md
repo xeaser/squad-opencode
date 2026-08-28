@@ -101,7 +101,7 @@ Each original-Squad ease row is a **squad-oc command** you already ran, a **late
 | Snapshot team files | `export` / `import` |
 | Move team out of the worktree | `externalize` / `internalize` |
 | Context / PII hygiene | `nap` / `scrub-emails` |
-| Local spans / observability | `squad-oc traces` (`.squad/traces/spans.jsonl`) + optional OTLP push via `OTEL_EXPORTER_OTLP_ENDPOINT` |
+| Local spans / observability | `squad-oc traces` (JSONL + OpenCode SQLite ingest for TUI/Web/serve) + optional OTLP; Langfuse plugin optional for streaming |
 | Drop-in `mcp-config.json` | `squad-oc mcp init` / `apply` / `list` |
 | Marketplace browse + install | `squad-oc marketplace browse` / `install` |
 | Office / themed names | `squad-oc init --theme office` (native `@michael`) or later `cast --theme office` (mention map; `@lead` gone) |

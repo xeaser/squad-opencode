@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,10 +15,30 @@ import (
 	"testing"
 	"time"
 
+	_ "modernc.org/sqlite"
+
 	"github.com/xeaser/squad-opencode/internal/brief"
 	"github.com/xeaser/squad-opencode/internal/squad"
 	"github.com/xeaser/squad-opencode/internal/traces"
 )
+
+func TestMain(m *testing.M) {
+	tracesIngestPush = func(context.Context, traces.Settings, traces.Span, *traces.Span) error {
+		return nil
+	}
+	_ = os.Unsetenv("OPENCODE_DB")
+	_ = os.Unsetenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	_ = os.Unsetenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")
+	xdg, err := os.MkdirTemp("", "squad-cli-xdg-*")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	_ = os.Setenv("XDG_DATA_HOME", xdg)
+	code := m.Run()
+	_ = os.RemoveAll(xdg)
+	os.Exit(code)
+}
 
 func TestHelpAndUnknown(t *testing.T) {
 	if Execute(nil) != 0 {
@@ -141,11 +162,19 @@ func TestRunWatchBadOTLPProtocolExit2(t *testing.T) {
 
 func TestTracesCLI(t *testing.T) {
 	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "xdg"))
 	prev, _ := os.Getwd()
 	if err := os.Chdir(root); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.Chdir(prev) })
+
+	origFollow := tracesFollowFn
+	tracesFollowFn = func(string) int { return 0 }
+	t.Cleanup(func() { tracesFollowFn = origFollow })
+	if Execute([]string{"traces", "--follow"}) != 0 {
+		t.Fatal("follow flag")
+	}
 
 	if Execute([]string{"traces", "--nope"}) != 2 {
 		t.Fatal("unknown flag")
@@ -221,6 +250,87 @@ func TestTracesCLI(t *testing.T) {
 	}
 	if !strings.Contains(string(body), `"resourceSpans"`) || !strings.Contains(string(body), "squad-oc.watch.execute") {
 		t.Fatalf("otlp: %s", body)
+	}
+}
+
+func TestTracesCLIIngestThenExport(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "xdg"))
+	dbPath := filepath.Join(root, "oc.db")
+	writeCLIIngestDB(t, dbPath, root)
+	t.Setenv("OPENCODE_DB", dbPath)
+
+	prev, _ := os.Getwd()
+	if err := os.Chdir(root); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(prev) })
+
+	dest := filepath.Join(root, "ingest.otlp.json")
+	out := captureStdout(t, func() {
+		if Execute([]string{"traces", "--export", dest}) != 0 {
+			t.Fatal("traces --export after ingest")
+		}
+	})
+	if !strings.Contains(out, dest) {
+		t.Fatalf("export msg: %s", out)
+	}
+	body, err := os.ReadFile(dest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(body)
+	for _, want := range []string{`"resourceSpans"`, traces.NameSession, traces.NameChat, "session.id", "gen_ai.conversation.id"} {
+		if !strings.Contains(s, want) {
+			t.Fatalf("missing %q in %s", want, s)
+		}
+	}
+	if strings.Contains(s, "gen_ai.input.messages") || strings.Contains(s, "SECRET") {
+		t.Fatal("export leaked bodies/messages")
+	}
+	spans, err := traces.List(root, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var chats int
+	for _, sp := range spans {
+		if sp.Name == traces.NameChat && sp.MessageID != "" && sp.SessionID == "ses_cli" {
+			chats++
+		}
+	}
+	if chats != 1 {
+		t.Fatalf("ingested chats=%d spans=%d", chats, len(spans))
+	}
+}
+
+func writeCLIIngestDB(t *testing.T, path, projectRoot string) {
+	t.Helper()
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	_, err = db.Exec(`
+CREATE TABLE session (
+  id text, parent_id text, directory text, agent text, model text,
+  time_created integer, time_updated integer, time_archived integer
+);
+CREATE TABLE message (
+  id text, session_id text, time_created integer, time_updated integer, data text
+);
+CREATE TABLE part (
+  id text, message_id text, session_id text, time_created integer, time_updated integer, data text
+);
+INSERT INTO session VALUES ('ses_cli', NULL, ?, 'squad', '{"id":"m","providerID":"p"}', 1, 2, NULL);
+INSERT INTO message VALUES
+ ('u1', 'ses_cli', 1000, 1000, '{"role":"user","time":{"created":1000}}'),
+ ('msg_cli', 'ses_cli', 1100, 1200, '{"role":"assistant","parentID":"u1","mode":"squad","modelID":"m","providerID":"p","cost":0.1,"tokens":{"input":1,"output":2,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1100,"completed":1200}}');
+INSERT INTO part VALUES
+ ('p1', 'u1', 'ses_cli', 1000, 1000, '{"type":"text","text":"hi"}'),
+ ('p2', 'msg_cli', 'ses_cli', 1100, 1200, '{"type":"text","text":"yo"}');
+`, projectRoot)
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 

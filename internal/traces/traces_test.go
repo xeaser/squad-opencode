@@ -286,6 +286,7 @@ func TestExportOTLPHasGenAINoBodies(t *testing.T) {
 		"gen_ai.usage.cost",
 		"gen_ai.agent.name",
 		"gen_ai.conversation.id",
+		"session.id",
 	} {
 		if !strings.Contains(s, want) {
 			t.Fatalf("missing %q in %s", want, s)

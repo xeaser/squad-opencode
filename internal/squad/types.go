@@ -29,6 +29,8 @@ type Config struct {
 	ThemeOrigin string `json:"themeOrigin,omitempty"`
 	// OTLP is optional live OTLP export settings (env wins at resolve time).
 	OTLP *OTLPConfig `json:"otlp,omitempty"`
+	// OpenCodeDB is an optional path to opencode.db (OPENCODE_DB wins).
+	OpenCodeDB string `json:"opencode_db,omitempty"`
 }
 
 // MentionRow is one row in .squad/mentions.md (slugs without @).
