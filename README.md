@@ -86,7 +86,7 @@ OpenCode creates `.opencode/package.json` (`@opencode-ai/plugin`) and runs an in
 | `cast --theme office` / `none` | `init --theme office` (native `@michael`) or later `cast --theme office` (mention map; `@lead` gone) |
 | `recast` | Regenerate `.opencode/agents` from `.squad/team.md` |
 | `run -p <prompt>` / `--file <path> [--agent name] [--url]` | Prompt the OpenCode HTTP API as `squad`; auto-starts `opencode serve` on :4096 only |
-| `watch` / `triage` / `loop` `[--execute] [--interval minutes] [--once] [--health] [--url] [--overnight-start HH:MM] [--overnight-end HH:MM] [--label name] [--log-file path] [--verbose] [--notify-level all\|important\|none] [--state-backend memory\|git-notes\|orphan-branch]` | Issue triage (Ralph); `--execute` uses `run` |
+| `watch` / `triage` / `loop` `[--execute] [--interval minutes] [--once] [--health] [--url] [--overnight-start HH:MM] [--overnight-end HH:MM] [--label name] [--force] [--retry-label name] [--log-file path] [--verbose] [--notify-level all\|important\|none] [--state-backend memory\|git-notes\|orphan-branch]` | Issue triage (Ralph); `--execute` uses `run`; skips issues with an open linked PR unless `--force` or `--retry-label` (default `ralph-retry`) |
 | `export [file]` / `import <file> [--with-host]` | JSON snapshot of `.squad/` (optional host files) |
 | `externalize [--key name]` / `internalize` | Move *this* project's team out of the worktree |
 | `nap [--dry-run] [--deep]` / `scrub-emails [directory]` | Context and PII hygiene |

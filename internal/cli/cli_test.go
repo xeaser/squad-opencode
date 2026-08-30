@@ -88,6 +88,12 @@ func TestAliasDispatch(t *testing.T) {
 	if code := Execute([]string{"watch", "--state-backend", "memory", "--health"}); code == 2 {
 		t.Fatal("--state-backend memory should not be unknown")
 	}
+	if code := Execute([]string{"watch", "--force", "--once"}); code == 2 {
+		t.Fatal("--force should not be unknown")
+	}
+	if code := Execute([]string{"watch", "--retry-label", "ralph-retry", "--once"}); code == 2 {
+		t.Fatal("--retry-label should not be unknown")
+	}
 }
 
 func TestInitExportImportViaCLI(t *testing.T) {

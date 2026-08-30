@@ -335,6 +335,140 @@ func TestFormatHealthZero(t *testing.T) {
 	}
 }
 
+func TestPassSkipsIssueWithOpenLinkedPR(t *testing.T) {
+	root := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	fake := &opencodeclient.FakeRunner{Text: "done"}
+	ok, summary, err := Pass(context.Background(), Options{
+		ProjectRoot: root,
+		Execute:     true,
+		Lister:      StaticLister{Issues: []Issue{{Number: 7, Title: "Bug", State: "OPEN"}}},
+		PRChecker:   StaticPRChecker{Links: map[int]int{7: 3}},
+		Runner:      fake,
+	})
+	if err != nil || ok {
+		t.Fatalf("ok=%v err=%v %s", ok, err, summary)
+	}
+	if len(fake.Calls) != 0 {
+		t.Fatalf("must not execute skipped issue: %+v", fake.Calls)
+	}
+	if !strings.Contains(summary, "skipped=1") {
+		t.Fatal(summary)
+	}
+	h, herr := ReadHealth(root)
+	if herr != nil {
+		t.Fatal(herr)
+	}
+	if !strings.Contains(h.LastSummary, "skipped=1") {
+		t.Fatalf("health summary %q", h.LastSummary)
+	}
+	if len(h.Skipped) != 1 || h.Skipped[0].Number != 7 || h.Skipped[0].Reason != SkipReasonOpenPR || h.Skipped[0].PR != 3 {
+		t.Fatalf("skipped %+v", h.Skipped)
+	}
+}
+
+func TestPassExecutesUnlinkedIssue(t *testing.T) {
+	root := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	fake := &opencodeclient.FakeRunner{Text: "done"}
+	ok, summary, err := Pass(context.Background(), Options{
+		ProjectRoot: root,
+		Execute:     true,
+		Lister: StaticLister{Issues: []Issue{
+			{Number: 7, Title: "has PR", State: "OPEN"},
+			{Number: 8, Title: "free", State: "OPEN"},
+		}},
+		PRChecker: StaticPRChecker{Links: map[int]int{7: 3}},
+		Runner:    fake,
+	})
+	if err != nil || !ok {
+		t.Fatalf("ok=%v err=%v %s", ok, err, summary)
+	}
+	if len(fake.Calls) != 1 {
+		t.Fatal(fake.Calls)
+	}
+	if !strings.Contains(fake.Calls[0].Prompt, "#8") || strings.Contains(fake.Calls[0].Prompt, "#7") {
+		t.Fatalf("prompt should list remaining only:\n%s", fake.Calls[0].Prompt)
+	}
+	if !strings.Contains(summary, "issues=1") || !strings.Contains(summary, "skipped=1") {
+		t.Fatal(summary)
+	}
+}
+
+func TestPassForceExecutesLinkedIssue(t *testing.T) {
+	root := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	fake := &opencodeclient.FakeRunner{Text: "done"}
+	ok, _, err := Pass(context.Background(), Options{
+		ProjectRoot: root,
+		Execute:     true,
+		Force:       true,
+		Lister:      StaticLister{Issues: []Issue{{Number: 7, Title: "Bug", State: "OPEN"}}},
+		PRChecker:   StaticPRChecker{Links: map[int]int{7: 3}},
+		Runner:      fake,
+	})
+	if err != nil || !ok {
+		t.Fatalf("ok=%v err=%v", ok, err)
+	}
+	if len(fake.Calls) != 1 {
+		t.Fatal(fake.Calls)
+	}
+	h, _ := ReadHealth(root)
+	if len(h.Skipped) != 0 {
+		t.Fatalf("force must not record skip: %+v", h.Skipped)
+	}
+}
+
+func TestPassRetryLabelExecutesLinkedIssue(t *testing.T) {
+	root := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	fake := &opencodeclient.FakeRunner{Text: "done"}
+	ok, _, err := Pass(context.Background(), Options{
+		ProjectRoot: root,
+		Execute:     true,
+		Lister: StaticLister{Issues: []Issue{{
+			Number: 7, Title: "Bug", State: "OPEN", Labels: []string{"ralph-retry"},
+		}}},
+		PRChecker: StaticPRChecker{Links: map[int]int{7: 3}},
+		Runner:    fake,
+	})
+	if err != nil || !ok {
+		t.Fatalf("ok=%v err=%v", ok, err)
+	}
+	if len(fake.Calls) != 1 {
+		t.Fatal(fake.Calls)
+	}
+}
+
+func TestPassPRCheckerErrorFails(t *testing.T) {
+	root := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	fake := &opencodeclient.FakeRunner{Text: "done"}
+	ok, _, err := Pass(context.Background(), Options{
+		ProjectRoot: root,
+		Execute:     true,
+		Lister:      StaticLister{Issues: []Issue{{Number: 7, Title: "Bug", State: "OPEN"}}},
+		PRChecker:   StaticPRChecker{Err: errors.New("gh down")},
+		Runner:      fake,
+	})
+	if err == nil || ok {
+		t.Fatal("want checker error")
+	}
+	if len(fake.Calls) != 0 {
+		t.Fatal(fake.Calls)
+	}
+}
+
 func TestPassWritesHealth(t *testing.T) {
 	root := t.TempDir()
 	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
