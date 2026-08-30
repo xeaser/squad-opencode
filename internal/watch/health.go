@@ -13,15 +13,16 @@ import (
 
 // Health is the live watch snapshot written to ralph-status.json (and optional state backends).
 type Health struct {
-	PID         int       `json:"pid"`
-	StartedAt   time.Time `json:"startedAt"`
-	LastPoll    time.Time `json:"lastPoll"`
-	LastSummary string    `json:"lastSummary"`
-	LastError   string    `json:"lastError,omitempty"`
-	Consecutive int       `json:"consecutiveErrors"`
-	NextPoll    time.Time `json:"nextPoll"`
-	Round       int       `json:"round"`
-	Overnight   bool      `json:"overnight"`
+	PID         int            `json:"pid"`
+	StartedAt   time.Time      `json:"startedAt"`
+	LastPoll    time.Time      `json:"lastPoll"`
+	LastSummary string         `json:"lastSummary"`
+	LastError   string         `json:"lastError,omitempty"`
+	Consecutive int            `json:"consecutiveErrors"`
+	NextPoll    time.Time      `json:"nextPoll"`
+	Round       int            `json:"round"`
+	Overnight   bool           `json:"overnight"`
+	Skipped     []SkippedIssue `json:"skipped,omitempty"`
 }
 
 // StatusPath is ralph-status.json under the live team directory.

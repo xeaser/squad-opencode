@@ -119,6 +119,7 @@ Commands:
   run -p <prompt> | --file <path> [--agent name] [--url]
   watch | triage | loop [--execute] [--interval minutes] [--once] [--health] [--url]
       [--overnight-start HH:MM] [--overnight-end HH:MM] [--label name]
+      [--project N] [--column name] [--force] [--retry-label name]
       [--log-file path] [--verbose] [--notify-level all|important|none]
       [--state-backend memory|git-notes|orphan-branch]
   export [file]
@@ -621,8 +622,10 @@ func cmdWatch(args []string) int {
 	interval := 10
 	verbose := false
 	notifyLevel := watch.NotifyImportant
-	var overnightStart, overnightEnd, apiURL, logFile, stateBackend string
+	var overnightStart, overnightEnd, apiURL, logFile, stateBackend, retryLabel, column string
 	var labels []string
+	force := false
+	project := 0
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch {
@@ -634,6 +637,8 @@ func cmdWatch(args []string) int {
 			health = true
 		case a == "--verbose":
 			verbose = true
+		case a == "--force":
+			force = true
 		case a == "--interval" && i+1 < len(args):
 			i++
 			n, err := strconv.Atoi(args[i])
@@ -654,6 +659,20 @@ func cmdWatch(args []string) int {
 		case a == "--label" && i+1 < len(args):
 			i++
 			labels = append(labels, args[i])
+		case a == "--project" && i+1 < len(args):
+			i++
+			n, err := strconv.Atoi(args[i])
+			if err != nil || n < 1 {
+				fmt.Fprintln(os.Stderr, "invalid --project")
+				return 2
+			}
+			project = n
+		case a == "--column" && i+1 < len(args):
+			i++
+			column = args[i]
+		case a == "--retry-label" && i+1 < len(args):
+			i++
+			retryLabel = args[i]
 		case a == "--log-file" && i+1 < len(args):
 			i++
 			logFile = args[i]
@@ -686,6 +705,10 @@ func cmdWatch(args []string) int {
 		fmt.Fprintln(os.Stderr, err)
 		return 2
 	}
+	if column != "" && project == 0 {
+		fmt.Fprintln(os.Stderr, "--column requires --project")
+		return 2
+	}
 	if health {
 		return cmdWatchHealth(root, backend)
 	}
@@ -703,8 +726,16 @@ func cmdWatch(args []string) int {
 		Logger: func(_ watch.NotifyLevel, msg string) {
 			fmt.Println(msg)
 		},
-		Backend: backend,
-		Lister:  githubissues.GHLister{Dir: root, Labels: labels},
+		Backend:    backend,
+		Lister:     githubissues.GHLister{Dir: root, Labels: labels},
+		PRChecker:  githubissues.GHPRChecker{Dir: root},
+		Project:    project,
+		Column:     column,
+		Force:      force,
+		RetryLabel: retryLabel,
+	}
+	if project > 0 {
+		opts.ProjectSource = githubissues.GHProjectSource{Dir: root}
 	}
 	if exec {
 		ensured, code := ensureAPI(apiURL, root)

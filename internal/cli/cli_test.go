@@ -88,6 +88,24 @@ func TestAliasDispatch(t *testing.T) {
 	if code := Execute([]string{"watch", "--state-backend", "memory", "--health"}); code == 2 {
 		t.Fatal("--state-backend memory should not be unknown")
 	}
+	if code := Execute([]string{"watch", "--force", "--once"}); code == 2 {
+		t.Fatal("--force should not be unknown")
+	}
+	if code := Execute([]string{"watch", "--retry-label", "ralph-retry", "--once"}); code == 2 {
+		t.Fatal("--retry-label should not be unknown")
+	}
+	if code := Execute([]string{"watch", "--project", "3", "--once"}); code == 2 {
+		t.Fatal("--project should not be unknown")
+	}
+	if code := Execute([]string{"watch", "--project", "3", "--column", "Todo", "--once"}); code == 2 {
+		t.Fatal("--column with --project should not be unknown")
+	}
+	if Execute([]string{"watch", "--column", "Todo", "--once"}) != 2 {
+		t.Fatal("--column without --project should be 2")
+	}
+	if Execute([]string{"watch", "--project", "nope", "--once"}) != 2 {
+		t.Fatal("invalid --project should be 2")
+	}
 }
 
 func TestInitExportImportViaCLI(t *testing.T) {

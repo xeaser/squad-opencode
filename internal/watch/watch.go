@@ -19,11 +19,68 @@ import (
 // pushOTLP is the OTel export hook. TestMain no-ops it; collector-down tests replace it.
 var pushOTLP = traces.Push
 
+const (
+	SkipReasonOpenPR  = "open-pr"
+	DefaultRetryLabel = "ralph-retry"
+)
+
 // Issue is a work item (usually a GitHub issue).
 type Issue struct {
+	Number int      `json:"number"`
+	Title  string   `json:"title"`
+	State  string   `json:"state"`
+	Labels []string `json:"labels,omitempty"`
+}
+
+// SkippedIssue is one issue dropped this pass (open linked PR).
+type SkippedIssue struct {
 	Number int    `json:"number"`
-	Title  string `json:"title"`
-	State  string `json:"state"`
+	Reason string `json:"reason"` // "open-pr"
+	PR     int    `json:"pr,omitempty"`
+}
+
+// ProjectItem is one GitHub Project v2 item (issue number + Status).
+type ProjectItem struct {
+	Number int
+	Status string
+}
+
+// ProjectSource lists items on a GitHub Project v2.
+type ProjectSource interface {
+	Items(ctx context.Context, project int) ([]ProjectItem, error)
+}
+
+// StaticProjectSource returns a fixed list (tests).
+type StaticProjectSource struct {
+	List []ProjectItem
+	Err  error
+}
+
+// Items implements ProjectSource.
+func (s StaticProjectSource) Items(context.Context, int) ([]ProjectItem, error) {
+	if s.Err != nil {
+		return nil, s.Err
+	}
+	return s.List, nil
+}
+
+// LinkedPRChecker maps issue numbers to an open PR that links them.
+type LinkedPRChecker interface {
+	OpenLinks(ctx context.Context) (map[int]int, error) // issue -> pr
+}
+
+// StaticPRChecker returns a fixed issue→PR map (tests).
+type StaticPRChecker struct {
+	Links map[int]int
+	Err   error
+}
+
+// OpenLinks implements LinkedPRChecker.
+func (s StaticPRChecker) OpenLinks(context.Context) (map[int]int, error) {
+	if s.Err != nil {
+		return nil, s.Err
+	}
+	return s.Links, nil
 }
 
 // IssueLister lists actionable issues.
@@ -53,6 +110,12 @@ type Options struct {
 	Now            func() time.Time
 	Runner         opencodeclient.Runner
 	Lister         IssueLister
+	PRChecker      LinkedPRChecker
+	ProjectSource  ProjectSource
+	Project        int    // GitHub Project v2 number; 0 = no filter
+	Column         string // Status field; requires Project
+	Force          bool
+	RetryLabel     string
 	Labels         []string
 	LogFile        string
 	Verbose        bool
@@ -244,7 +307,8 @@ func clockNow(opts Options) time.Time {
 
 // Pass runs one poll cycle. Returns whether execute ran.
 func Pass(ctx context.Context, opts Options) (executed bool, summary string, err error) {
-	defer func() { writePassHealth(opts, summary, err) }()
+	var skipped []SkippedIssue
+	defer func() { writePassHealth(opts, summary, err, skipped) }()
 	prevOvernight := false
 	if h, rerr := loadHealth(context.Background(), opts); rerr == nil {
 		prevOvernight = h.Overnight
@@ -277,17 +341,43 @@ func Pass(ctx context.Context, opts Options) (executed bool, summary string, err
 		notify(opts, NotifyImportant, "list error: "+err.Error())
 		return false, "", err
 	}
+	if opts.Project > 0 {
+		if opts.ProjectSource == nil {
+			err = fmt.Errorf("no project source")
+			notify(opts, NotifyImportant, err.Error())
+			return false, "", err
+		}
+		var items []ProjectItem
+		items, err = opts.ProjectSource.Items(ctx, opts.Project)
+		if err != nil {
+			notify(opts, NotifyImportant, "project filter: "+err.Error())
+			return false, "", err
+		}
+		issues = intersectProject(issues, items, opts.Column)
+	}
+	if opts.PRChecker != nil {
+		var links map[int]int
+		links, err = opts.PRChecker.OpenLinks(ctx)
+		if err != nil {
+			notify(opts, NotifyImportant, "open-pr check: "+err.Error())
+			return false, "", err
+		}
+		issues, skipped = dropLinkedIssues(issues, links, opts)
+	}
 	ctxText, err := BuildContext(opts.ProjectRoot, issues, opts.Labels...)
 	if err != nil {
 		notify(opts, NotifyImportant, "context error: "+err.Error())
 		return false, "", err
 	}
-	summary = fmt.Sprintf("issues=%d execute=%v", len(issues), opts.Execute)
+	summary = fmt.Sprintf("issues=%d skipped=%d execute=%v", len(issues), len(skipped), opts.Execute)
 	if !opts.Execute {
 		if opts.Notify == NotifyAll {
 			notify(opts, NotifyAll, ctxText)
 		}
 		return false, summary + "\n" + ctxText, nil
+	}
+	if len(issues) == 0 {
+		return false, summary, nil
 	}
 	if opts.Runner == nil {
 		err = fmt.Errorf("execute requires a runner")
@@ -338,7 +428,61 @@ func Pass(ctx context.Context, opts Options) (executed bool, summary string, err
 	return true, summary + "\n" + res.Text, nil
 }
 
-func writePassHealth(opts Options, summary string, err error) {
+func dropLinkedIssues(issues []Issue, links map[int]int, opts Options) ([]Issue, []SkippedIssue) {
+	if opts.Force || len(links) == 0 {
+		return issues, nil
+	}
+	retry := opts.RetryLabel
+	if retry == "" {
+		retry = DefaultRetryLabel
+	}
+	var remaining []Issue
+	var skipped []SkippedIssue
+	for _, is := range issues {
+		pr, linked := links[is.Number]
+		if linked && !issueHasLabel(is, retry) {
+			skipped = append(skipped, SkippedIssue{
+				Number: is.Number,
+				Reason: SkipReasonOpenPR,
+				PR:     pr,
+			})
+			continue
+		}
+		remaining = append(remaining, is)
+	}
+	return remaining, skipped
+}
+
+func intersectProject(issues []Issue, items []ProjectItem, column string) []Issue {
+	want := make(map[int]bool, len(items))
+	for _, it := range items {
+		if it.Number <= 0 {
+			continue
+		}
+		if column != "" && !strings.EqualFold(it.Status, column) {
+			continue
+		}
+		want[it.Number] = true
+	}
+	var remaining []Issue
+	for _, is := range issues {
+		if want[is.Number] {
+			remaining = append(remaining, is)
+		}
+	}
+	return remaining
+}
+
+func issueHasLabel(is Issue, name string) bool {
+	for _, l := range is.Labels {
+		if l == name {
+			return true
+		}
+	}
+	return false
+}
+
+func writePassHealth(opts Options, summary string, err error, skipped []SkippedIssue) {
 	if opts.ProjectRoot == "" && opts.Backend == nil {
 		return
 	}
@@ -352,6 +496,7 @@ func writePassHealth(opts Options, summary string, err error) {
 	}
 	h.LastPoll = now
 	h.LastSummary = firstLine(summary)
+	h.Skipped = skipped
 	h.Round++
 	if err != nil {
 		h.LastError = err.Error()

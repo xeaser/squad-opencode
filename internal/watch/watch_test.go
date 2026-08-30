@@ -335,6 +335,332 @@ func TestFormatHealthZero(t *testing.T) {
 	}
 }
 
+func TestPassSkipsIssueWithOpenLinkedPR(t *testing.T) {
+	root := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	fake := &opencodeclient.FakeRunner{Text: "done"}
+	ok, summary, err := Pass(context.Background(), Options{
+		ProjectRoot: root,
+		Execute:     true,
+		Lister:      StaticLister{Issues: []Issue{{Number: 7, Title: "Bug", State: "OPEN"}}},
+		PRChecker:   StaticPRChecker{Links: map[int]int{7: 3}},
+		Runner:      fake,
+	})
+	if err != nil || ok {
+		t.Fatalf("ok=%v err=%v %s", ok, err, summary)
+	}
+	if len(fake.Calls) != 0 {
+		t.Fatalf("must not execute skipped issue: %+v", fake.Calls)
+	}
+	if !strings.Contains(summary, "skipped=1") {
+		t.Fatal(summary)
+	}
+	h, herr := ReadHealth(root)
+	if herr != nil {
+		t.Fatal(herr)
+	}
+	if !strings.Contains(h.LastSummary, "skipped=1") {
+		t.Fatalf("health summary %q", h.LastSummary)
+	}
+	if len(h.Skipped) != 1 || h.Skipped[0].Number != 7 || h.Skipped[0].Reason != SkipReasonOpenPR || h.Skipped[0].PR != 3 {
+		t.Fatalf("skipped %+v", h.Skipped)
+	}
+}
+
+func TestPassExecutesUnlinkedIssue(t *testing.T) {
+	root := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	fake := &opencodeclient.FakeRunner{Text: "done"}
+	ok, summary, err := Pass(context.Background(), Options{
+		ProjectRoot: root,
+		Execute:     true,
+		Lister: StaticLister{Issues: []Issue{
+			{Number: 7, Title: "has PR", State: "OPEN"},
+			{Number: 8, Title: "free", State: "OPEN"},
+		}},
+		PRChecker: StaticPRChecker{Links: map[int]int{7: 3}},
+		Runner:    fake,
+	})
+	if err != nil || !ok {
+		t.Fatalf("ok=%v err=%v %s", ok, err, summary)
+	}
+	if len(fake.Calls) != 1 {
+		t.Fatal(fake.Calls)
+	}
+	if !strings.Contains(fake.Calls[0].Prompt, "#8") || strings.Contains(fake.Calls[0].Prompt, "#7") {
+		t.Fatalf("prompt should list remaining only:\n%s", fake.Calls[0].Prompt)
+	}
+	if !strings.Contains(summary, "issues=1") || !strings.Contains(summary, "skipped=1") {
+		t.Fatal(summary)
+	}
+}
+
+func TestPassForceExecutesLinkedIssue(t *testing.T) {
+	root := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	fake := &opencodeclient.FakeRunner{Text: "done"}
+	ok, _, err := Pass(context.Background(), Options{
+		ProjectRoot: root,
+		Execute:     true,
+		Force:       true,
+		Lister:      StaticLister{Issues: []Issue{{Number: 7, Title: "Bug", State: "OPEN"}}},
+		PRChecker:   StaticPRChecker{Links: map[int]int{7: 3}},
+		Runner:      fake,
+	})
+	if err != nil || !ok {
+		t.Fatalf("ok=%v err=%v", ok, err)
+	}
+	if len(fake.Calls) != 1 {
+		t.Fatal(fake.Calls)
+	}
+	h, _ := ReadHealth(root)
+	if len(h.Skipped) != 0 {
+		t.Fatalf("force must not record skip: %+v", h.Skipped)
+	}
+}
+
+func TestPassRetryLabelExecutesLinkedIssue(t *testing.T) {
+	root := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	fake := &opencodeclient.FakeRunner{Text: "done"}
+	ok, _, err := Pass(context.Background(), Options{
+		ProjectRoot: root,
+		Execute:     true,
+		Lister: StaticLister{Issues: []Issue{{
+			Number: 7, Title: "Bug", State: "OPEN", Labels: []string{"ralph-retry"},
+		}}},
+		PRChecker: StaticPRChecker{Links: map[int]int{7: 3}},
+		Runner:    fake,
+	})
+	if err != nil || !ok {
+		t.Fatalf("ok=%v err=%v", ok, err)
+	}
+	if len(fake.Calls) != 1 {
+		t.Fatal(fake.Calls)
+	}
+}
+
+type recordingProjectSource struct {
+	calls int
+	items []ProjectItem
+	err   error
+}
+
+func (r *recordingProjectSource) Items(context.Context, int) ([]ProjectItem, error) {
+	r.calls++
+	if r.err != nil {
+		return nil, r.err
+	}
+	return r.items, nil
+}
+
+func TestPassNoProjectDoesNotCallProjectSource(t *testing.T) {
+	root := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	src := &recordingProjectSource{items: []ProjectItem{{Number: 7, Status: "Todo"}}}
+	fake := &opencodeclient.FakeRunner{Text: "done"}
+	ok, summary, err := Pass(context.Background(), Options{
+		ProjectRoot:   root,
+		Execute:       true,
+		Lister:        StaticLister{Issues: []Issue{{Number: 8, Title: "off board", State: "OPEN"}}},
+		ProjectSource: src,
+		Runner:        fake,
+	})
+	if err != nil || !ok {
+		t.Fatalf("ok=%v err=%v %s", ok, err, summary)
+	}
+	if src.calls != 0 {
+		t.Fatalf("no --project must not call project source: calls=%d", src.calls)
+	}
+	if len(fake.Calls) != 1 {
+		t.Fatal(fake.Calls)
+	}
+	if !strings.Contains(fake.Calls[0].Prompt, "#8") {
+		t.Fatalf("listing unchanged:\n%s", fake.Calls[0].Prompt)
+	}
+}
+
+func TestPassProjectIntersectsIssues(t *testing.T) {
+	root := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	fake := &opencodeclient.FakeRunner{Text: "done"}
+	ok, summary, err := Pass(context.Background(), Options{
+		ProjectRoot: root,
+		Execute:     true,
+		Project:     3,
+		Lister: StaticLister{Issues: []Issue{
+			{Number: 7, Title: "on board", State: "OPEN"},
+			{Number: 8, Title: "off board", State: "OPEN"},
+			{Number: 9, Title: "also on", State: "OPEN"},
+		}},
+		ProjectSource: StaticProjectSource{List: []ProjectItem{
+			{Number: 7, Status: "Todo"},
+			{Number: 9, Status: "In Progress"},
+		}},
+		Runner: fake,
+	})
+	if err != nil || !ok {
+		t.Fatalf("ok=%v err=%v %s", ok, err, summary)
+	}
+	if len(fake.Calls) != 1 {
+		t.Fatal(fake.Calls)
+	}
+	prompt := fake.Calls[0].Prompt
+	if !strings.Contains(prompt, "#7") || !strings.Contains(prompt, "#9") || strings.Contains(prompt, "#8") {
+		t.Fatalf("want project intersection only:\n%s", prompt)
+	}
+	if !strings.Contains(summary, "issues=2") {
+		t.Fatal(summary)
+	}
+}
+
+func TestPassColumnFiltersStatusCaseInsensitive(t *testing.T) {
+	root := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	fake := &opencodeclient.FakeRunner{Text: "done"}
+	ok, summary, err := Pass(context.Background(), Options{
+		ProjectRoot: root,
+		Execute:     true,
+		Project:     3,
+		Column:      "todo",
+		Lister: StaticLister{Issues: []Issue{
+			{Number: 7, Title: "todo", State: "OPEN"},
+			{Number: 8, Title: "doing", State: "OPEN"},
+		}},
+		ProjectSource: StaticProjectSource{List: []ProjectItem{
+			{Number: 7, Status: "Todo"},
+			{Number: 8, Status: "In Progress"},
+		}},
+		Runner: fake,
+	})
+	if err != nil || !ok {
+		t.Fatalf("ok=%v err=%v %s", ok, err, summary)
+	}
+	if len(fake.Calls) != 1 {
+		t.Fatal(fake.Calls)
+	}
+	if !strings.Contains(fake.Calls[0].Prompt, "#7") || strings.Contains(fake.Calls[0].Prompt, "#8") {
+		t.Fatalf("want Todo column only:\n%s", fake.Calls[0].Prompt)
+	}
+}
+
+func TestPassProjectThenOpenPRSkip(t *testing.T) {
+	root := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	fake := &opencodeclient.FakeRunner{Text: "done"}
+	ok, summary, err := Pass(context.Background(), Options{
+		ProjectRoot: root,
+		Execute:     true,
+		Project:     3,
+		Lister: StaticLister{Issues: []Issue{
+			{Number: 7, Title: "has PR", State: "OPEN"},
+			{Number: 8, Title: "free", State: "OPEN"},
+		}},
+		ProjectSource: StaticProjectSource{List: []ProjectItem{
+			{Number: 7, Status: "Todo"},
+			{Number: 8, Status: "Todo"},
+		}},
+		PRChecker: StaticPRChecker{Links: map[int]int{7: 3}},
+		Runner:    fake,
+	})
+	if err != nil || !ok {
+		t.Fatalf("ok=%v err=%v %s", ok, err, summary)
+	}
+	if len(fake.Calls) != 1 {
+		t.Fatal(fake.Calls)
+	}
+	if !strings.Contains(fake.Calls[0].Prompt, "#8") || strings.Contains(fake.Calls[0].Prompt, "#7") {
+		t.Fatalf("PR skip after project filter:\n%s", fake.Calls[0].Prompt)
+	}
+	if !strings.Contains(summary, "issues=1") || !strings.Contains(summary, "skipped=1") {
+		t.Fatal(summary)
+	}
+}
+
+func TestPassEmptyAfterProjectNoExecute(t *testing.T) {
+	root := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	fake := &opencodeclient.FakeRunner{Text: "done"}
+	ok, summary, err := Pass(context.Background(), Options{
+		ProjectRoot:   root,
+		Execute:       true,
+		Project:       3,
+		Lister:        StaticLister{Issues: []Issue{{Number: 7, Title: "off board", State: "OPEN"}}},
+		ProjectSource: StaticProjectSource{List: []ProjectItem{{Number: 9, Status: "Todo"}}},
+		Runner:        fake,
+	})
+	if err != nil || ok {
+		t.Fatalf("ok=%v err=%v %s", ok, err, summary)
+	}
+	if len(fake.Calls) != 0 {
+		t.Fatal(fake.Calls)
+	}
+	if !strings.Contains(summary, "issues=0") {
+		t.Fatal(summary)
+	}
+}
+
+func TestPassProjectSourceErrorFails(t *testing.T) {
+	root := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	fake := &opencodeclient.FakeRunner{Text: "done"}
+	ok, _, err := Pass(context.Background(), Options{
+		ProjectRoot:   root,
+		Execute:       true,
+		Project:       3,
+		Lister:        StaticLister{Issues: []Issue{{Number: 7, Title: "Bug", State: "OPEN"}}},
+		ProjectSource: StaticProjectSource{Err: errors.New("gh down")},
+		Runner:        fake,
+	})
+	if err == nil || ok {
+		t.Fatal("want project source error")
+	}
+	if len(fake.Calls) != 0 {
+		t.Fatal(fake.Calls)
+	}
+}
+
+func TestPassPRCheckerErrorFails(t *testing.T) {
+	root := t.TempDir()
+	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {
+		t.Fatal(err)
+	}
+	fake := &opencodeclient.FakeRunner{Text: "done"}
+	ok, _, err := Pass(context.Background(), Options{
+		ProjectRoot: root,
+		Execute:     true,
+		Lister:      StaticLister{Issues: []Issue{{Number: 7, Title: "Bug", State: "OPEN"}}},
+		PRChecker:   StaticPRChecker{Err: errors.New("gh down")},
+		Runner:      fake,
+	})
+	if err == nil || ok {
+		t.Fatal("want checker error")
+	}
+	if len(fake.Calls) != 0 {
+		t.Fatal(fake.Calls)
+	}
+}
+
 func TestPassWritesHealth(t *testing.T) {
 	root := t.TempDir()
 	if _, err := squad.WriteDefaultPreset(squad.InitOptions{ProjectRoot: root}); err != nil {

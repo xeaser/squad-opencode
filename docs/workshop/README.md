@@ -433,7 +433,7 @@ Detach later with `squad-oc link --off` (this repo uses its local `.squad/` agai
 
 **Time:** about 10 minutes.
 
-Ralph is `squad-oc watch` (aliases: `triage`, `loop`). It lists GitHub issues via `gh` and, with `--execute`, prompts the **squad** agent over the OpenCode **HTTP API** (`opencode serve`), not the TUI.
+Ralph is `squad-oc watch` (aliases: `triage`, `loop`). It lists GitHub issues via `gh` and, with `--execute`, prompts the **squad** agent over the OpenCode **HTTP API** (`opencode serve`), not the TUI. Optional `--project N` keeps only issues on that GitHub Project v2 (`--column` matches Status). Issues that already have an open linked PR are skipped; `--force` or `--retry-label` (default `ralph-retry`) re-enables them.
 
 Needs:
 
