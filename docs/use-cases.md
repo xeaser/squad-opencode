@@ -126,7 +126,7 @@ Each original-Squad ease row is a **squad-oc command** you already ran, a **late
 | 3. First conversation / hire the team | Workshop §2 — Tab → **squad** → **yes** |
 | 4. Playground (talk, parallel, decisions) | Workshop §3–4 |
 | 5. GitHub Issues routing | Workshop §6 — `watch --label` (no Copilot label bot) |
-| 6. Project board tracking | **later** / not a Phase 0 command |
+| 6. Project board tracking | **supported** — `watch --project N` (optional `--column` Status) |
 | 7. Ralph | Workshop §6 — `watch --execute --once` |
 | 8. Skills marketplace | Workshop §9 — `marketplace browse` / `install`; named `name@source` later P4 |
 | 9. MCP (Teams, Outlook, …) | Workshop §8 — `mcp apply` (disabled stub; Teams/Outlook are examples only) |

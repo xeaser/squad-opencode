@@ -39,6 +39,31 @@ type SkippedIssue struct {
 	PR     int    `json:"pr,omitempty"`
 }
 
+// ProjectItem is one GitHub Project v2 item (issue number + Status).
+type ProjectItem struct {
+	Number int
+	Status string
+}
+
+// ProjectSource lists items on a GitHub Project v2.
+type ProjectSource interface {
+	Items(ctx context.Context, project int) ([]ProjectItem, error)
+}
+
+// StaticProjectSource returns a fixed list (tests).
+type StaticProjectSource struct {
+	List []ProjectItem
+	Err  error
+}
+
+// Items implements ProjectSource.
+func (s StaticProjectSource) Items(context.Context, int) ([]ProjectItem, error) {
+	if s.Err != nil {
+		return nil, s.Err
+	}
+	return s.List, nil
+}
+
 // LinkedPRChecker maps issue numbers to an open PR that links them.
 type LinkedPRChecker interface {
 	OpenLinks(ctx context.Context) (map[int]int, error) // issue -> pr
@@ -86,6 +111,9 @@ type Options struct {
 	Runner         opencodeclient.Runner
 	Lister         IssueLister
 	PRChecker      LinkedPRChecker
+	ProjectSource  ProjectSource
+	Project        int    // GitHub Project v2 number; 0 = no filter
+	Column         string // Status field; requires Project
 	Force          bool
 	RetryLabel     string
 	Labels         []string
@@ -313,6 +341,20 @@ func Pass(ctx context.Context, opts Options) (executed bool, summary string, err
 		notify(opts, NotifyImportant, "list error: "+err.Error())
 		return false, "", err
 	}
+	if opts.Project > 0 {
+		if opts.ProjectSource == nil {
+			err = fmt.Errorf("no project source")
+			notify(opts, NotifyImportant, err.Error())
+			return false, "", err
+		}
+		var items []ProjectItem
+		items, err = opts.ProjectSource.Items(ctx, opts.Project)
+		if err != nil {
+			notify(opts, NotifyImportant, "project filter: "+err.Error())
+			return false, "", err
+		}
+		issues = intersectProject(issues, items, opts.Column)
+	}
 	if opts.PRChecker != nil {
 		var links map[int]int
 		links, err = opts.PRChecker.OpenLinks(ctx)
@@ -409,6 +451,26 @@ func dropLinkedIssues(issues []Issue, links map[int]int, opts Options) ([]Issue,
 		remaining = append(remaining, is)
 	}
 	return remaining, skipped
+}
+
+func intersectProject(issues []Issue, items []ProjectItem, column string) []Issue {
+	want := make(map[int]bool, len(items))
+	for _, it := range items {
+		if it.Number <= 0 {
+			continue
+		}
+		if column != "" && !strings.EqualFold(it.Status, column) {
+			continue
+		}
+		want[it.Number] = true
+	}
+	var remaining []Issue
+	for _, is := range issues {
+		if want[is.Number] {
+			remaining = append(remaining, is)
+		}
+	}
+	return remaining
 }
 
 func issueHasLabel(is Issue, name string) bool {

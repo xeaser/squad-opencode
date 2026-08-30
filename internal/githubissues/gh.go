@@ -186,6 +186,95 @@ func (g GHPRChecker) exec(ctx context.Context, args ...string) ([]byte, error) {
 	return bytes.TrimSpace(stdout.Bytes()), nil
 }
 
+// GHProjectSource lists GitHub Project v2 items (issue number + Status).
+type GHProjectSource struct {
+	Dir string
+	run func(ctx context.Context, args ...string) ([]byte, error)
+}
+
+// Items implements watch.ProjectSource.
+func (g GHProjectSource) Items(ctx context.Context, project int) ([]watch.ProjectItem, error) {
+	owner, err := g.owner(ctx)
+	if err != nil {
+		return nil, err
+	}
+	raw, err := g.exec(ctx, "project", "item-list", strconv.Itoa(project), "--owner", owner, "--format", "json", "--limit", "1000")
+	if err != nil {
+		return nil, err
+	}
+	return ParseProjectItemsJSON(raw)
+}
+
+func (g GHProjectSource) owner(ctx context.Context) (string, error) {
+	raw, err := g.exec(ctx, "repo", "view", "--json", "owner")
+	if err != nil {
+		return "", err
+	}
+	var wrap struct {
+		Owner struct {
+			Login string `json:"login"`
+		} `json:"owner"`
+	}
+	if err := json.Unmarshal(raw, &wrap); err != nil || wrap.Owner.Login == "" {
+		preview := string(raw)
+		if len(preview) > 160 {
+			preview = preview[:160]
+		}
+		if err != nil {
+			return "", fmt.Errorf("gh repo view: not JSON (%w): %q", err, preview)
+		}
+		return "", fmt.Errorf("gh repo view: empty owner: %q", preview)
+	}
+	return wrap.Owner.Login, nil
+}
+
+func (g GHProjectSource) exec(ctx context.Context, args ...string) ([]byte, error) {
+	if g.run != nil {
+		return g.run(ctx, args...)
+	}
+	cmd := exec.CommandContext(ctx, "gh", args...)
+	if g.Dir != "" {
+		cmd.Dir = g.Dir
+	}
+	cmd.Env = append(os.Environ(), "NO_COLOR=1", "CLICOLOR=0", "GH_FORCE_TTY=0", "GH_PROMPT_DISABLED=1")
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("gh %s: %w (%s)", strings.Join(args, " "), err, strings.TrimSpace(stderr.String()))
+	}
+	return bytes.TrimSpace(stdout.Bytes()), nil
+}
+
+// ParseProjectItemsJSON parses `gh project item-list --format json`.
+func ParseProjectItemsJSON(data []byte) ([]watch.ProjectItem, error) {
+	if len(bytes.TrimSpace(data)) == 0 {
+		return nil, nil
+	}
+	var wrap struct {
+		Items []struct {
+			Status  string `json:"status"`
+			Content struct {
+				Number int `json:"number"`
+			} `json:"content"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal(data, &wrap); err != nil {
+		return nil, fmt.Errorf("gh project item-list: not JSON (%w)", err)
+	}
+	var out []watch.ProjectItem
+	for _, it := range wrap.Items {
+		if it.Content.Number <= 0 {
+			continue
+		}
+		out = append(out, watch.ProjectItem{
+			Number: it.Content.Number,
+			Status: it.Status,
+		})
+	}
+	return out, nil
+}
+
 func parseBodyIssueRefs(body string) []int {
 	low := strings.ToLower(body)
 	var out []int
